@@ -12,6 +12,7 @@ Then tests 3x3 subsquares
 
 Example output:
 [paul@radiohead suduku_count]$ ./sudoku_count 
+
 Bad=1503505, Candidate=10000, Good=0
 		0.660718%	0.000000%
 Bad=3051824, Candidate=20000, Good=0
