@@ -7,6 +7,8 @@ worldwide. This software is distributed without any warranty.
 See <http://creativecommons.org/publicdomain/zero/1.0/>. */
 
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 /* This is xoshiro256** 1.0, one of our all-purpose, rock-solid
    generators. It has excellent (sub-ns) speed, a state (256 bits) that is
@@ -32,9 +34,14 @@ static uint64_t s[4];
 
 /* Added by Paul H Alfille
  * for seeding */
-#include <sys/random.h>
 void seed_xoshiro(void) {
-        getrandom( s, sizeof(s), GRND_RANDOM ) ;
+	FILE *fp = fopen("/dev/urandom", "r");
+	if ( fp == NULL ) {
+		fprintf(stderr,"Cannot open system urandom file\n");
+		exit(1) ;
+	}
+	fread(s, sizeof(s), 1, fp);
+	fclose(fp);
 }
 
 uint64_t next_xoshiro(void) {
