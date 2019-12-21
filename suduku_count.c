@@ -7,10 +7,14 @@
 #include "suduku_count.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
+#include <time.h>
 
 // SIZE x SIZE suduku board
 #define SIZE (9)
 # define SUBSIZE (3) // sqrt of SIZE
+
+#define Zero(array) memset( array, 0, sizeof(array) ) ;
 
 typedef enum { Good_Square, Candidate_Square, Bad_Square } square_ret ;
 
@@ -38,14 +42,6 @@ int reverse_pattern( int pat ) {
 
 // Full board (holds bit patterns)
 int bit[SIZE][SIZE] ;
-void zero_bits( void ) {
-    int i,j;
-    for (i=0;i<SIZE;++i) {
-        for (j=0;j<SIZE;++j) {
-            bit[i][j] = 0 ;
-        }
-    }
-}
 
 int find_valid_bit( int mask ) {
     int trial ;
@@ -84,23 +80,25 @@ void print_square( void ) {
 square_ret fill_square( void ) {
     int i,j ;
     int col_bits[SIZE] ;
+    int row_bits[SIZE] ;
     
-    zero_bits() ;
+    Zero(bit) ;
+    
     // column bits culmulative
-    for ( j=0 ; j<SIZE ; ++j ) {
-        col_bits[j] = 0 ;
-    }
+    Zero( col_bits ) ;
+    
+    // row bits culmulative
+    Zero( row_bits ) ;
     
     // Fill columns and rows
     for (i=0;i<SIZE;++i) {
-        int row_bits = 0 ;
         for (j=0;j<SIZE;++j) {
-            int b = find_valid_bit( col_bits[j]|row_bits ) ;
+            int b = find_valid_bit( col_bits[j]|row_bits[i] ) ;
             if (b == 0 ) {
                 return Bad_Square ;
             }
-            row_bits |= b ;
-            col_bits[j] = col_bits[j] | b ;
+            row_bits[i] |= b ;
+            col_bits[j] |= b ;
             bit[i][j] = b ;
         }
     }
@@ -126,15 +124,17 @@ square_ret fill_square( void ) {
 
 
 int main(void) {
-    int count ;
     int bad=0 ;
     int candidate=0 ;
     int good=0;
+    clock_t start ;
     
     SEED ;
     make_pattern();
+    
+    start = clock() ;
 
-    for ( count=0 ; count<100000000 ; ++count ) {
+    while ( 1 ) {
         switch( fill_square() ) {
             case Bad_Square:
                 ++bad ;
@@ -142,13 +142,17 @@ int main(void) {
             case Candidate_Square:
                 ++candidate ;
                 if ( candidate % 10000 == 0 ) {
-                    printf("Bad=%d, Candidate=%d, Good=%d\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(100.*candidate)/(bad+candidate+good),(100.*good)/(bad+candidate+good)) ;
+					int total = bad+candidate+good ;
+                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
                 }
                 break ;
             case Good_Square:
                 ++good ;
                 print_square() ;
-                printf("Bad=%d, Candidate=%d, Good=%d\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(100.*candidate)/(bad+candidate+good),(100.*good)/(bad+candidate+good)) ;
+                if ( 1 ) {
+					int total = bad+candidate+good ;
+                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
+                }
                 break ;
         }
     }
