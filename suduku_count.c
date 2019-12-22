@@ -66,22 +66,35 @@ int find_valid_bit( int mask ) {
 void print_square( void ) {
     int i ;
     int j ;
+    
+    // Initial blank
     fprintf(stderr,"\n");
+
+    // top line
     for ( j=0 ; j<SIZE ; ++j ) {
         fprintf(stderr,"+---");
-    }
+	}
+	// end of top line
     fprintf(stderr,"+\n");
-    for (i=0 ; i<SIZE ; ++i ) {
-        
+    
+    for (i=0 ; i<SIZE ; ++i ) { // each row
         for ( j=0 ; j<SIZE ; ++j ) {
-            fprintf(stderr,"|%2d ",reverse_pattern(bit[i][j]));
+			int c = (j%SUBSIZE)?':':'|' ;
+            fprintf(stderr,"%c%2d ",c,reverse_pattern(bit[i][j]));
         }
+        // end of row
         fprintf(stderr,"|\n");
+        
+        // Separator line
         for ( j=0 ; j<SIZE ; ++j ) {
-            fprintf(stderr,"+---");
+			int c = ((i+1)%SUBSIZE)?' ':'-';
+            fprintf(stderr,"+%c-%c",c,c);
         }
+        // end of separator
         fprintf(stderr,"+\n");
     } 
+
+	// Final blank
     fprintf(stderr,"\n");
 }    
 
@@ -226,7 +239,7 @@ int Type2Loop() {
                 ++candidate ;
                 if ( candidate % 10000 == 0 ) {
 					int total = bad+candidate+good ;
-                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
+                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
                 }
                 break ;
             case Good_Square:
@@ -234,7 +247,7 @@ int Type2Loop() {
                 print_square() ;
                 if ( 1 ) {
 					int total = bad+candidate+good ;
-                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
+                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
                 }
                 break ;
         }
@@ -292,9 +305,9 @@ int SS1Loop() {
 		if ( c == TOTALSIZE ) {
 			++good ;
 			print_square() ;
-			printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\n\t\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+			printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
 		} else if ( count % 100000 == 0 ) {
-			printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\n\t\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+			printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
 		}
     }
 }
