@@ -1,0 +1,10 @@
+CODE OF CONDUCT
+
+This is a simple project to explore an interesting math problem. (Creating SUDUKU candidates).
+
+There is no place for rudeness, badgering, or hijacking discussions for unrelated issues, either 
+commercial or political or idealogical. Find another forum, please. On the other hand, we welcome
+any related discussion -- the point of the project is to share ideas.
+
+So courtesy is expected, and contact me if anything here (even my entries) fail to meet these rather
+inclusive standards.
