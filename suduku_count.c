@@ -22,6 +22,8 @@
 typedef enum { Good_Square, Candidate_Square, Bad_Square } square_ret ;
 clock_t start ;
 
+FILE * fsolutions ;
+
 // bit pattern
 int pattern[SIZE] ;
 int full_pattern ;
@@ -67,6 +69,17 @@ void print_square( void ) {
     int i ;
     int j ;
     
+    // print to file?
+    if ( fsolutions ) {
+		fprintf(fsolutions,"%d",reverse_pattern(bit[0][0]));
+		for (i=0;i<SIZE;++i) {
+			for (j=1;j<SIZE;++j) {
+				fprintf(fsolutions,",%d",reverse_pattern(bit[i][j]));
+			}
+		}
+		fprintf(fsolutions,"\n");
+	}
+    
     // Initial blank
     fprintf(stderr,"\n");
 
@@ -98,7 +111,7 @@ void print_square( void ) {
     fprintf(stderr,"\n");
 }    
 
-square_ret Type1_fill_square( void ) {
+int Type1_fill_square( void ) {
     int i,j ;
     int col_bits[SIZE] ;
     int row_bits[SIZE] ;
@@ -116,7 +129,7 @@ square_ret Type1_fill_square( void ) {
         for (j=0;j<SIZE;++j) {
             int b = find_valid_bit( col_bits[j]|row_bits[i] ) ;
             if (b == 0 ) {
-                return Bad_Square ;
+                return (int) Bad_Square ;
             }
             row_bits[i] |= b ;
             col_bits[j] |= b ;
@@ -135,21 +148,21 @@ square_ret Type1_fill_square( void ) {
                 }
             }
             if ( sub_bits != full_pattern ) {
-                return Candidate_Square ;
+                return (int) Candidate_Square ;
             }
         }
     } 
     
-    return Good_Square ;
+    return (int) Good_Square ;
 }
 
-int Type1Loop() {
+void TypeLoop( int (*fill)(void) ) {
     int bad=0 ;
     int candidate=0 ;
     int good=0;
 
     while ( 1 ) {
-        switch( Type1_fill_square() ) {
+        switch( (square_ret) fill() ) {
             case Bad_Square:
                 ++bad ;
                 break ;
@@ -172,7 +185,7 @@ int Type1Loop() {
     }
 }
 
-square_ret Type2_fill_square( void ) {
+int Type2_fill_square( void ) {
     int i,j,k ;
     int col_bits[SIZE] ;
     int row_bits[SIZE] ;
@@ -190,7 +203,7 @@ square_ret Type2_fill_square( void ) {
         for (j=k;j<SIZE;++j) {
             int b = find_valid_bit( col_bits[j]|row_bits[k] ) ;
             if (b == 0 ) {
-                return Bad_Square ;
+                return (int) Bad_Square ;
             }
             row_bits[k] |= b ;
             col_bits[j] |= b ;
@@ -199,7 +212,7 @@ square_ret Type2_fill_square( void ) {
         for (i=k+1;i<SIZE;++i) {
             int b = find_valid_bit( col_bits[k]|row_bits[i] ) ;
             if (b == 0 ) {
-                return Bad_Square ;
+                return (int) Bad_Square ;
             }
             row_bits[i] |= b ;
             col_bits[k] |= b ;
@@ -218,40 +231,11 @@ square_ret Type2_fill_square( void ) {
                 }
             }
             if ( sub_bits != full_pattern ) {
-                return Candidate_Square ;
+                return (int) Candidate_Square ;
             }
         }
     } 
-        return Good_Square ;
-}
-
-int Type2Loop() {
-    int bad=0 ;
-    int candidate=0 ;
-    int good=0;
-
-    while ( 1 ) {
-        switch( Type2_fill_square() ) {
-            case Bad_Square:
-                ++bad ;
-                break ;
-            case Candidate_Square:
-                ++candidate ;
-                if ( candidate % 10000 == 0 ) {
-					int total = bad+candidate+good ;
-                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
-                }
-                break ;
-            case Good_Square:
-                ++good ;
-                print_square() ;
-                if ( 1 ) {
-					int total = bad+candidate+good ;
-                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
-                }
-                break ;
-        }
-    }
+        return (int) Good_Square ;
 }
 
 int SS1_fill_square( void ) {
@@ -293,16 +277,84 @@ int SS1_fill_square( void ) {
 	return count ;
 }
 
-int SS1Loop() {
+// big diagonals as well
+int X_fill_square( void ) {
+    int si,sj,ssi,ssj,count=0 ;
+    int col_bits[SIZE] ;
+    int row_bits[SIZE] ;
+    int ss_bits[SUBSIZE][SUBSIZE] ;
+    int diag1=0 ;
+    int diag2=0;
+    Zero(bit) ;
+    
+    // column bits culmulative
+    Zero( col_bits ) ;
+    
+    // row bits culmulative
+    Zero( row_bits ) ;
+    
+    // subsquare bits culmulative
+    Zero( ss_bits ) ;
+    
+    // Fill columns and rows
+    for (si=0;si<SUBSIZE;++si) {
+        for (sj=0;sj<SUBSIZE;++sj) {
+			for (ssi=0;ssi<SUBSIZE;++ssi) {
+				for ( ssj=0;ssj<SUBSIZE;++ssj,++count) {
+					int i = SUBSIZE*si+ssi ;
+					int j = SUBSIZE*sj+ssj ;
+					int m = col_bits[j]|row_bits[i]|ss_bits[si][sj] ;
+					int b ;
+					if ( i != j ) { // not main diagonal
+						if ( SIZE-i != j ) { // not 2nd diagonal
+							b = find_valid_bit( m ) ;
+							if (b == 0 ) {
+								return count ;
+							}
+						} else { // second diagonal
+							b = find_valid_bit( m|diag2 ) ;
+							if (b == 0 ) {
+								return count ;
+							}
+							diag2|=b ;
+						}
+					} else {
+						if ( SIZE-i != j ) { // not any diagonal
+							b = find_valid_bit( m|diag1 ) ;
+							if (b == 0 ) {
+								return count ;
+							}
+							diag1 |= b ;
+						} else { // Both diagonals (center)
+							b = find_valid_bit( m|diag2|diag1 ) ;
+							if (b == 0 ) {
+								return count ;
+							}
+							diag2|=b ;
+							diag1|=b ;
+						}
+					}
+					row_bits[i] |= b ;
+					col_bits[j] |= b ;
+					ss_bits[si][sj] |= b ;
+					bit[i][j] = b ;
+				}
+			}
+		}
+    }
+	return count ;
+}
+
+void SSLoop( int (*fill)(void) ) {
 	int count = 0 ;
 	int good = 0 ;
 	uint64_t totalcount = 0 ;
 
     while ( 1 ) {
-		int c = SS1_fill_square() ;
+		int filled = fill() ;
 		++count ;
-		totalcount += c ;
-		if ( c == TOTALSIZE ) {
+		totalcount += filled ;
+		if ( filled == TOTALSIZE ) {
 			++good ;
 			print_square() ;
 			printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
@@ -322,48 +374,64 @@ void help(void) {
 	"\t -t 1\tSearch columns first, then test for subsquares (default)\n"
 	"\t -t 2\tSearch columns/row alternating, then test for subsquares\n"
 	"\t -s 1\tSearch subsquares by column, show failure point\n"
+	"\t -x  \tAlso main diagonals are unique (added constraint), show failure point\n"
+	"\t -f filename\tplace solutions in 'filename' (81 comma-separated values per line\n"
 	"\t -h  \tShow these instructions\n"
 	);
 }
 
 int main(int argc, char ** argv) {
-	int c ;
-
+	int c ;	
+	
+	void (*loop)( int (*fill)(void) ) = TypeLoop ; 
+	int (*fill)(void) = Type1_fill_square ; 
+		
     SEED ;
     make_pattern();
         
     start = clock() ;
 
-	do {
-		switch( getopt( argc, argv, "ht:s:" ) ) {
+	while ( (c = getopt( argc, argv, "hxt:s:f:" )) != -1 ) {
+		switch(c) 
+		{
 			case 't':
-				switch (atoi(optarg)) {
-					case 2:
-						Type2Loop();
+				loop = TypeLoop ;
+				switch (optarg[0]) {
+					case '2':
+						fill = Type2_fill_square ;
 						break ;
 					default:
-						Type1Loop() ;
+						fill = Type1_fill_square;
 						break ;
 				}
 				break ;
 			case 's':
-				switch (atoi(optarg)) {
-					case 1:
-						SS1Loop();
-						break ;
+				loop = SSLoop ;
+				switch (optarg[0]) {
+					case '1':
 					default:
-						SS1Loop() ;
+						fill = SS1_fill_square ;
 						break ;
 				}
 				break ;
-			case -1:
-				Type1Loop();
-				break;
+			case 'x':
+				loop = SSLoop ;
+				fill = X_fill_square ;
+				break ;
+			case 'f':
+				// solution file
+				fsolutions = fopen( optarg, "w" ) ;
+				if ( fsolutions == NULL ) {
+					fprintf( stderr, "Trouble opening solutions file %s\n",optarg) ;
+					exit(1);
+				}
+				break ;
 			case 'h':
 			default:
 				help() ;
-				break;
+				exit(1);
 		} 
-	} while (0) ;
+	}
+	loop(fill) ;
 	return 0 ;
 }
