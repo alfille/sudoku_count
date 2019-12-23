@@ -1,4 +1,4 @@
-// Sudoku_count
+// Sudoku_count16 -- 16x16 version
 // Attempt to count the number of legal sudoku positions
 // Based on Discussion between Kendrick Shaw MD PhD and Paul Alfille MD
 // MIT license 2019
@@ -13,8 +13,8 @@
 #include <stdlib.h>
 
 // SIZE x SIZE sudoku board
-#define SIZE (9)
-# define SUBSIZE (3) // sqrt of SIZE
+#define SIZE (16)
+# define SUBSIZE (4) // sqrt of SIZE
 # define TOTALSIZE (SIZE*SIZE)
 
 #define Zero(array) memset( array, 0, sizeof(array) ) ;
