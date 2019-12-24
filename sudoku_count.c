@@ -11,6 +11,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <limits.h>
 
 // SIZE x SIZE sudoku board
 #define SIZE (9)
@@ -19,14 +20,18 @@
 
 #define Zero(array) memset( array, 0, sizeof(array) ) ;
 
-typedef enum { Good_Square, Candidate_Square, Bad_Square } square_ret ;
 clock_t start ;
 
-FILE * fsolutions ;
+FILE * fsolutions = NULL ;
+FILE * fdistribution = NULL ;
+
+int max_tries = INT_MAX / TOTALSIZE ;
 
 // bit pattern
 int pattern[SIZE] ;
 int full_pattern ;
+
+int distribution[TOTALSIZE+1];
 
 // Make numbers int bit pattern (1=0x1 2=0x2 3=0x4...)
 void make_pattern(void) {
@@ -109,7 +114,18 @@ void print_square( void ) {
 
     // Final blank
     fprintf(stderr,"\n");
-}    
+}   
+
+void Distribution( void ) {
+	if ( fdistribution ) {
+		int d ;
+		fprintf(fdistribution,"%d",distribution[0]) ;
+		for ( d=1;d<=TOTALSIZE;++d) {
+			fprintf(fdistribution,",%d",distribution[d]) ; 
+		}
+		fprintf(fdistribution,"\n");
+	}
+}
 
 int Type1_fill_square( void ) {
     int i,j ;
@@ -129,7 +145,7 @@ int Type1_fill_square( void ) {
         for (j=0;j<SIZE;++j) {
             int b = find_valid_bit( col_bits[j]|row_bits[i] ) ;
             if (b == 0 ) {
-                return (int) Bad_Square ;
+                return i*SIZE+j ;
             }
             row_bits[i] |= b ;
             col_bits[j] |= b ;
@@ -148,45 +164,53 @@ int Type1_fill_square( void ) {
                 }
             }
             if ( sub_bits != full_pattern ) {
-                return (int) Candidate_Square ;
+                return TOTALSIZE ;
             }
         }
     } 
     
-    return (int) Good_Square ;
+    return -1 ;
 }
 
 void TypeLoop( int (*fill)(void) ) {
     int bad=0 ;
     int candidate=0 ;
     int good=0;
+    int count ;
 
-    while ( 1 ) {
-        switch( (square_ret) fill() ) {
-            case Bad_Square:
-                ++bad ;
-                break ;
-            case Candidate_Square:
-                ++candidate ;
-                if ( candidate % 10000 == 0 ) {
-                    int total = bad+candidate+good ;
-                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
-                }
-                break ;
-            case Good_Square:
+    for (count=0;count<=max_tries;++count ) {
+		int f = fill() ;
+        switch( f ) {
+            case -1:
                 ++good ;
                 print_square() ;
+                ++distribution[TOTALSIZE] ;
                 if ( 1 ) {
                     int total = bad+candidate+good ;
                     printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
                 }
                 break ;
+            case TOTALSIZE:
+                ++candidate ;
+                ++distribution[TOTALSIZE] ;
+                if ( candidate % 10000 == 0 ) {
+                    int total = bad+candidate+good ;
+                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
+                }
+                break ;
+            default:
+                ++bad ;
+                ++distribution[f] ;
+                break ;
         }
+        if ( count % 1000000 == 0 ) {
+			Distribution() ;
+		}
     }
 }
 
 int Type2_fill_square( void ) {
-    int i,j,k ;
+    int i,j,k,count=0 ;
     int col_bits[SIZE] ;
     int row_bits[SIZE] ;
     
@@ -202,8 +226,9 @@ int Type2_fill_square( void ) {
     for (k=0;k<SIZE;++k) {
         for (j=k;j<SIZE;++j) {
             int b = find_valid_bit( col_bits[j]|row_bits[k] ) ;
+            ++count ;
             if (b == 0 ) {
-                return (int) Bad_Square ;
+                return count ;
             }
             row_bits[k] |= b ;
             col_bits[j] |= b ;
@@ -211,8 +236,9 @@ int Type2_fill_square( void ) {
         }
         for (i=k+1;i<SIZE;++i) {
             int b = find_valid_bit( col_bits[k]|row_bits[i] ) ;
+            ++count ;
             if (b == 0 ) {
-                return (int) Bad_Square ;
+                return count ;
             }
             row_bits[i] |= b ;
             col_bits[k] |= b ;
@@ -231,11 +257,11 @@ int Type2_fill_square( void ) {
                 }
             }
             if ( sub_bits != full_pattern ) {
-                return (int) Candidate_Square ;
+                return TOTALSIZE ;
             }
         }
     } 
-        return (int) Good_Square ;
+        return -1 ;
 }
 
 int SS1_fill_square( void ) {
@@ -263,6 +289,7 @@ int SS1_fill_square( void ) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*sj+ssj ;
                     int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
+                    ++count ;
                     if (b == 0 ) {
                         return count ;
                     }
@@ -357,6 +384,102 @@ int SS2_fill_square( void ) {
     return TOTALSIZE ;
 }
 
+int SS3_fill_square( void ) {
+    int sk,ssk,si,sj,ssi,count=0 ;
+    int col_bits[SIZE] ;
+    int row_bits[SIZE] ;
+    int ss_bits[SUBSIZE][SUBSIZE] ;
+    
+    Zero(bit) ;
+    
+    // column bits culmulative
+    Zero( col_bits ) ;
+    
+    // row bits culmulative
+    Zero( row_bits ) ;
+    
+    // subsquare bits culmulative
+    Zero( ss_bits ) ;
+    // Fill columns and rows
+    // Top triangle
+    for (sk=0;sk<SUBSIZE;++sk) {
+		for (si=0;si<=sk;++si) {
+			sj = sk-si ;
+			// Top triangle
+			for(ssk=0;ssk<SUBSIZE;++ssk) {
+				for (ssi=0;ssi<=ssk;++ssi) {
+                    int i = SUBSIZE*si+ssi ;
+                    int j = SUBSIZE*sj+ssk-ssi ;
+                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
+                    ++count ;
+                    if (b == 0 ) {
+                        return count ;
+                    }
+                    row_bits[i] |= b ;
+                    col_bits[j] |= b ;
+                    ss_bits[si][sj] |= b ;
+                    bit[i][j] = b ;
+                }
+            }
+            // bottom triangle
+			for(ssk=1;ssk<SUBSIZE;++ssk) {
+				for (ssi=ssk;ssi<SUBSIZE;++ssi) {
+                    int i = SUBSIZE*si+ssi ;
+                    int j = SUBSIZE*sj+SUBSIZE-1+ssk-ssi ;
+                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
+                    ++count ;
+                    if (b == 0 ) {
+                        return count ;
+                    }
+                    row_bits[i] |= b ;
+                    col_bits[j] |= b ;
+                    ss_bits[si][sj] |= b ;
+                    bit[i][j] = b ;
+                }
+            }
+        }
+    }
+    // bottom triangle
+    for (sk=1;sk<SUBSIZE;++sk) {
+		for (si=sk;si<SUBSIZE;++si) {
+			sj = SUBSIZE-1+sk-si ; ;
+			// Top triangle
+			for(ssk=0;ssk<SUBSIZE;++ssk) {
+				for (ssi=0;ssi<=ssk;++ssi) {
+                    int i = SUBSIZE*si+ssi ;
+                    int j = SUBSIZE*sj+ssk-ssi ;
+                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
+                    ++count ;
+                    if (b == 0 ) {
+                        return count ;
+                    }
+                    row_bits[i] |= b ;
+                    col_bits[j] |= b ;
+                    ss_bits[si][sj] |= b ;
+                    bit[i][j] = b ;
+                }
+            }
+            // bottom triangle
+			for(ssk=1;ssk<SUBSIZE;++ssk) {
+				for (ssi=ssk;ssi<SUBSIZE;++ssi) {
+                    int i = SUBSIZE*si+ssi ;
+                    int j = SUBSIZE*sj+SUBSIZE-1+ssk-ssi ;
+                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
+                    ++count ;
+                    if (b == 0 ) {
+                        return count ;
+                    }
+                    row_bits[i] |= b ;
+                    col_bits[j] |= b ;
+                    ss_bits[si][sj] |= b ;
+                    bit[i][j] = b ;
+                }
+            }
+        }
+    }
+    return TOTALSIZE ;
+}
+
 // big diagonals as well
 int X_fill_square( void ) {
     int si,sj,ssi,ssj,count=0 ;
@@ -426,14 +549,14 @@ int X_fill_square( void ) {
 }
 
 void SSLoop( int (*fill)(void) ) {
-    int count = 0 ;
+    int count ;
     int good = 0 ;
     uint64_t totalcount = 0 ;
 
-    while ( 1 ) {
+    for ( count=0; count<=max_tries; ++count ) {
         int filled = fill() ;
-        ++count ;
         totalcount += filled ;
+        ++distribution[filled] ;
         if ( filled == TOTALSIZE ) {
             ++good ;
             print_square() ;
@@ -441,10 +564,13 @@ void SSLoop( int (*fill)(void) ) {
         } else if ( count % 100000 == 0 ) {
             printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
         }
+        if ( count % 1000000 == 0 ) {
+			Distribution() ;
+		}
     }
 }
 
-void help(void) {
+void help(char * prog) {
     printf(
     "sudoku_count by Paul H Alfille 2019 MIT License\n"
     "\tSearch the possible sudoku space for valid positions\n"
@@ -452,13 +578,21 @@ void help(void) {
     "\tSee https:\\github.com/alfille/sudoku_count\n"
     "\tSee https:\\github.com/alfille/sudoku_count\n"
     "\n"
+    "%s [options] [attempts]\n"
+    "\n",
+    "options:\n"
     "\t -t 1\tSearch columns first, then test for subsquares (default)\n"
     "\t -t 2\tSearch columns/row alternating, then test for subsquares\n"
     "\t -s 1\tSearch subsquares by column, show failure point\n"
     "\t -s 2\tSearch subsquares column/row alternating, show failure point\n"
+    "\t -s 3\tSearch subsquares diagonal approach, show failure point\n"
     "\t -x  \tAlso main diagonals are unique (added constraint), show failure point\n"
-    "\t -f filename\tplace solutions in 'filename' (81 comma-separated values per line\n"
+    "\t -f filename\tPlace solutions in 'filename' (81 comma-separated values per line\n"
+    "\t -d filename\tDistribution of tries (number of square aborted) every 1^6 tries\n"
     "\t -h  \tShow these instructions\n"
+    "\n"
+    "Attempts: number of boards to try (unlimited if omitted)\n",
+    prog
     );
 }
 
@@ -471,6 +605,8 @@ int main(int argc, char ** argv) {
     SEED ;
     make_pattern();
         
+	Zero(distribution) ;
+	
     start = clock() ;
 
     while ( (c = getopt( argc, argv, "hxt:s:f:" )) != -1 ) {
@@ -490,6 +626,9 @@ int main(int argc, char ** argv) {
             case 's':
                 loop = SSLoop ;
                 switch (optarg[0]) {
+                    case '3':
+                        fill = SS3_fill_square ;
+                        break ;
                     case '2':
                         fill = SS2_fill_square ;
                         break ;
@@ -510,12 +649,30 @@ int main(int argc, char ** argv) {
                     exit(1);
                 }
                 break ;
+            case 'd':
+                // distribution file
+                fdistribution = fopen( optarg, "w" ) ;
+                if ( fdistribution == NULL ) {
+                    fprintf( stderr, "Trouble opening distribution file %s\n",optarg) ;
+                    exit(1);
+                }
+                break ;
             case 'h':
             default:
-                help() ;
+                help(argv[0]) ;
                 exit(1);
         } 
     }
+    
+    // optind is for the extra arguments 
+    // which are not parsed 
+    if (optind < argc) {
+		long int m = strtol(argv[optind],NULL,0) ;
+		if ( m > 0 && m < max_tries ) {
+			max_tries = m ;
+		}
+    } 
+    
     loop(fill) ;
     return 0 ;
 }
