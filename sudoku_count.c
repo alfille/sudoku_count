@@ -609,7 +609,7 @@ int main(int argc, char ** argv) {
 	
     start = clock() ;
 
-    while ( (c = getopt( argc, argv, "hxt:s:f:" )) != -1 ) {
+    while ( (c = getopt( argc, argv, "hxt:s:f:d:" )) != -1 ) {
         switch(c) 
         {
             case 't':
@@ -674,5 +674,6 @@ int main(int argc, char ** argv) {
     } 
     
     loop(fill) ;
+    Distribution() ;
     return 0 ;
 }
