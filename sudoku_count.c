@@ -287,7 +287,7 @@ int SS1_fill_square( void ) {
     for (si=0;si<SUBSIZE;++si) {
         for (sj=0;sj<SUBSIZE;++sj) {
             for (ssi=0;ssi<SUBSIZE;++ssi) {
-                for ( ssj=0;ssj<SUBSIZE;++ssj,++count) {
+                for ( ssj=0;ssj<SUBSIZE;++ssj) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*sj+ssj ;
                     int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
@@ -328,10 +328,11 @@ int SS2_fill_square( void ) {
     for (k=0;k<SUBSIZE;++k) {
         for (si=k;si<SUBSIZE;++si) {
             for (sk=0;sk<SUBSIZE;++sk) {
-                for (ssi=sk;ssi<SUBSIZE;++ssi,++count) {
+                for (ssi=sk;ssi<SUBSIZE;++ssi) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*k+sk ;
                     int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][k] ) ;
+					++count ;
                     if (b == 0 ) {
                         return count ;
                     }
@@ -340,10 +341,11 @@ int SS2_fill_square( void ) {
                     ss_bits[si][k] |= b ;
                     bit[i][j] = b ;
                 }
-                for ( ssj=sk+1;ssj<SUBSIZE;++ssj,++count) {
+                for ( ssj=sk+1;ssj<SUBSIZE;++ssj) {
                     int i = SUBSIZE*si+sk ;
                     int j = SUBSIZE*k+ssj ;
                     int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][k] ) ;
+					++count ;
                     if (b == 0 ) {
                         return count ;
                     }
@@ -356,10 +358,11 @@ int SS2_fill_square( void ) {
         }
         for (sj=k+1;sj<SUBSIZE;++sj) {
             for (sk=0 ; sk<SUBSIZE;++sk) {
-                for (ssi=sk;ssi<SUBSIZE;++ssi,++count) {
+                for (ssi=sk;ssi<SUBSIZE;++ssi) {
                     int i = SUBSIZE*k+ssi ;
                     int j = SUBSIZE*sj+sk ;
                     int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[k][sj] ) ;
+					++count ;
                     if (b == 0 ) {
                         return count ;
                     }
@@ -368,10 +371,11 @@ int SS2_fill_square( void ) {
                     ss_bits[k][sj] |= b ;
                     bit[i][j] = b ;
                 }
-                for ( ssj=sk+1;ssj<SUBSIZE;++ssj,++count) {
+                for ( ssj=sk+1;ssj<SUBSIZE;++ssj) {
                     int i = SUBSIZE*k+sk ;
                     int j = SUBSIZE*sj+ssj ;
                     int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[k][sj] ) ;
+					++count ;
                     if (b == 0 ) {
                         return count ;
                     }
