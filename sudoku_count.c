@@ -12,6 +12,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <limits.h>
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 
 // SIZE x SIZE sudoku board
 #define SIZE (9)
@@ -25,13 +27,13 @@ clock_t start ;
 FILE * fsolutions = NULL ;
 FILE * fdistribution = NULL ;
 
-int max_tries = INT_MAX / TOTALSIZE ;
+uint64_t max_tries = UINT64_MAX / TOTALSIZE ;
 
 // bit pattern
 int pattern[SIZE] ;
 int full_pattern ;
 
-int distribution[TOTALSIZE+1];
+uint64_t distribution[TOTALSIZE+1];
 
 // Make numbers int bit pattern (1=0x1 2=0x2 3=0x4...)
 void make_pattern(void) {
@@ -119,9 +121,9 @@ void print_square( void ) {
 void Distribution( void ) {
 	if ( fdistribution ) {
 		int d ;
-		fprintf(fdistribution,"%d",distribution[0]) ;
+		fprintf(fdistribution,"%"PRIu64,distribution[0]) ;
 		for ( d=1;d<=TOTALSIZE;++d) {
-			fprintf(fdistribution,",%d",distribution[d]) ; 
+			fprintf(fdistribution,",%"PRIu64,distribution[d]) ; 
 		}
 		fprintf(fdistribution,"\n");
 	}
@@ -173,10 +175,10 @@ int Type1_fill_square( void ) {
 }
 
 void TypeLoop( int (*fill)(void) ) {
-    int bad=0 ;
-    int candidate=0 ;
-    int good=0;
-    int count ;
+    uint64_t bad=0 ;
+    uint64_t candidate=0 ;
+    uint64_t good=0;
+    uint64_t count ;
 
     for (count=0;count<=max_tries;++count ) {
 		int f = fill() ;
@@ -186,16 +188,16 @@ void TypeLoop( int (*fill)(void) ) {
                 print_square() ;
                 ++distribution[TOTALSIZE] ;
                 if ( 1 ) {
-                    int total = bad+candidate+good ;
-                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
+                    uint64_t total = bad+candidate+good ;
+                    printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
                 }
                 break ;
             case TOTALSIZE:
                 ++candidate ;
                 ++distribution[TOTALSIZE] ;
                 if ( candidate % 10000 == 0 ) {
-                    int total = bad+candidate+good ;
-                    printf("Bad=%d, Candidate=%d, Good=%d\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
+                    uint64_t total = bad+candidate+good ;
+                    printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
                 }
                 break ;
             default:
@@ -549,8 +551,8 @@ int X_fill_square( void ) {
 }
 
 void SSLoop( int (*fill)(void) ) {
-    int count ;
-    int good = 0 ;
+    uint64_t count ;
+    uint64_t good = 0 ;
     uint64_t totalcount = 0 ;
 
     for ( count=0; count<=max_tries; ++count ) {
@@ -667,7 +669,7 @@ int main(int argc, char ** argv) {
     // optind is for the extra arguments 
     // which are not parsed 
     if (optind < argc) {
-		long int m = strtol(argv[optind],NULL,0) ;
+		uint64_t m = strtoull(argv[optind],NULL,0) ;
 		if ( m > 0 && m < max_tries ) {
 			max_tries = m ;
 		}
