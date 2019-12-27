@@ -26,6 +26,7 @@
 clock_t start ;
 
 volatile int rupt = 0 ;
+int quiet = 0 ;
 
 FILE * fsolutions = NULL ;
 FILE * fdistribution = NULL ;
@@ -74,51 +75,53 @@ int find_valid_bit( int mask ) {
     //printf("trial %x mask %x MATCH %x\n",trial,mask,mask&trial);
     return trial ;
 }
-        
+
 void print_square( void ) {
-    int i ;
-    int j ;
-    
-    // print to file?
-    if ( fsolutions ) {
-        fprintf(fsolutions,"%X",reverse_pattern(bit[0][0]));
-        for (i=0;i<SIZE;++i) {
-            for (j=1;j<SIZE;++j) {
-                fprintf(fsolutions,",%X",reverse_pattern(bit[i][j]));
-            }
-        }
-        fprintf(fsolutions,"\n");
-    }
-    
-    // Initial blank
-    fprintf(stderr,"\n");
+	if ( !quiet ) {
+		int i ;
+		int j ;
+		
+		// print to file?
+		if ( fsolutions ) {
+			fprintf(fsolutions,"%X",reverse_pattern(bit[0][0]));
+			for (i=0;i<SIZE;++i) {
+				for (j=1;j<SIZE;++j) {
+					fprintf(fsolutions,",%X",reverse_pattern(bit[i][j]));
+				}
+			}
+			fprintf(fsolutions,"\n");
+		}
+		
+		// Initial blank
+		fprintf(stderr,"\n");
 
-    // top line
-    for ( j=0 ; j<SIZE ; ++j ) {
-        fprintf(stderr,"+---");
-    }
-    // end of top line
-    fprintf(stderr,"+\n");
-    
-    for (i=0 ; i<SIZE ; ++i ) { // each row
-        for ( j=0 ; j<SIZE ; ++j ) {
-            int c = (j%SUBSIZE)?':':'|' ;
-            fprintf(stderr,"%c%2X ",c,reverse_pattern(bit[i][j]));
-        }
-        // end of row
-        fprintf(stderr,"|\n");
-        
-        // Separator line
-        for ( j=0 ; j<SIZE ; ++j ) {
-            int c = ((i+1)%SUBSIZE)?' ':'-';
-            fprintf(stderr,"+%c-%c",c,c);
-        }
-        // end of separator
-        fprintf(stderr,"+\n");
-    } 
+		// top line
+		for ( j=0 ; j<SIZE ; ++j ) {
+			fprintf(stderr,"+---");
+		}
+		// end of top line
+		fprintf(stderr,"+\n");
+		
+		for (i=0 ; i<SIZE ; ++i ) { // each row
+			for ( j=0 ; j<SIZE ; ++j ) {
+				int c = (j%SUBSIZE)?':':'|' ;
+				fprintf(stderr,"%c%2X ",c,reverse_pattern(bit[i][j]));
+			}
+			// end of row
+			fprintf(stderr,"|\n");
+			
+			// Separator line
+			for ( j=0 ; j<SIZE ; ++j ) {
+				int c = ((i+1)%SUBSIZE)?' ':'-';
+				fprintf(stderr,"+%c-%c",c,c);
+			}
+			// end of separator
+			fprintf(stderr,"+\n");
+		} 
 
-    // Final blank
-    fprintf(stderr,"\n");
+		// Final blank
+		fprintf(stderr,"\n");
+	}
 }   
 
 void Distribution( void ) {
@@ -178,8 +181,9 @@ int Type1_fill_square( void ) {
 }
 
 void TypeLoopPrint( uint64_t count, uint64_t candidate, uint64_t good ) {
-	printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%g.2\t%.6f%%\t%.6f%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
-}	
+	if ( !quiet ) {
+		printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%g.2\t%.6f%%\t%.6f%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
+}	}
 
 void TypeLoop( int (*fill)(void) ) {
     uint64_t bad=0 ;
@@ -700,8 +704,9 @@ int X_fill_square( void ) {
 }
 
 void SSLoopPrint( uint64_t count, uint64_t good, uint64_t totalcount ) {
-	printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
-}	
+	if ( !quiet ) {
+		printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+}	}
 
 void SSLoop( int (*fill)(void) ) {
     uint64_t count ;
@@ -754,6 +759,7 @@ void help(char * prog) {
     "\t -x  \tAlso main diagonals are unique (added constraint), show failure point\n"
     "\t -f filename\tPlace solutions in 'filename' (81 comma-separated values per line\n"
     "\t -d filename\tDistribution of tries (number of square aborted) every 1^6 tries\n"
+    "\t -q quiet\tSuppress most printing\n"
     "\t -h  \tShow these instructions\n"
     "\n"
     "Attempts: number of boards to try (unlimited if omitted)\n",
@@ -776,7 +782,7 @@ int main(int argc, char ** argv) {
 	
     start = clock() ;
 
-    while ( (c = getopt( argc, argv, "hxt:w:s:f:d:" )) != -1 ) {
+    while ( (c = getopt( argc, argv, "hqxt:w:s:f:d:" )) != -1 ) {
         switch(c) 
         {
             case 't':
@@ -838,6 +844,9 @@ int main(int argc, char ** argv) {
                     exit(1);
                 }
                 break ;
+			case 'q':
+				quiet = 1 ;
+				break ;
             case 'h':
             default:
                 help(argv[0]) ;
