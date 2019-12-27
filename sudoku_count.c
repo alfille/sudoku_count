@@ -30,6 +30,7 @@ int quiet = 0 ;
 
 FILE * fsolutions = NULL ;
 FILE * fdistribution = NULL ;
+FILE * fsummary = NULL ;
 
 uint64_t max_tries = UINT64_MAX / TOTALSIZE ;
 
@@ -185,6 +186,12 @@ void TypeLoopPrint( uint64_t count, uint64_t candidate, uint64_t good ) {
 		printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%g.2\t%.6f%%\t%.6f%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
 }	}
 
+void TypeLoopSummary( uint64_t count, uint64_t candidate, uint64_t good ) {
+	if ( fsummary ) {
+		fprintf(fsummary,"Bad\tCandidate\tGood\tperSec\tCand%%\tGood%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
+		fprintf(fsummary,"%"PRIu64"\r%"PRIu64"\t%"PRIu64"\t%g.2\t%.6f%%\t%.6f%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
+}	}
+
 void TypeLoop( int (*fill)(void) ) {
     uint64_t bad=0 ;
     uint64_t candidate=0 ;
@@ -216,6 +223,7 @@ void TypeLoop( int (*fill)(void) ) {
 			break ;
 		}
     }
+    TypeLoopSummary( count, candidate, good ) ;
 	TypeLoopPrint( count, candidate,good ) ;
 	Distribution() ;
 }
@@ -705,7 +713,13 @@ int X_fill_square( void ) {
 
 void SSLoopPrint( uint64_t count, uint64_t good, uint64_t totalcount ) {
 	if ( !quiet ) {
-		printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+		printf("count=%"PRIu64", Good=%"PRIu64"\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+}	}
+
+void SSLoopSummary( uint64_t count, uint64_t good, uint64_t totalcount ) {
+	if ( fsummary ) {
+		fprintf(fsummary,"Count\tGood\tAverage\tperSec\tSuccess%%n") ;
+		fprintf(fsummary,"%"PRIu64"\t%"PRIu64"\t%g.1\t%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
 }	}
 
 void SSLoop( int (*fill)(void) ) {
@@ -728,6 +742,7 @@ void SSLoop( int (*fill)(void) ) {
 			break ;
 		}
     }
+    SSLoopSummary(count,good,totalcount);
     SSLoopPrint( count, good, totalcount ) ;
     Distribution() ;
 }
@@ -759,6 +774,7 @@ void help(char * prog) {
     "\t -x  \tAlso main diagonals are unique (added constraint), show failure point\n"
     "\t -f filename\tPlace solutions in 'filename' (81 comma-separated values per line\n"
     "\t -d filename\tDistribution of tries (number of square aborted) every 1^6 tries\n"
+    "\t -g filename\tPlace summary data in filename\n"
     "\t -q quiet\tSuppress most printing\n"
     "\t -h  \tShow these instructions\n"
     "\n"
@@ -772,6 +788,7 @@ int main(int argc, char ** argv) {
     
     void (*loop)( int (*fill)(void) ) = TypeLoop ; 
     int (*fill)(void) = Type1_fill_square ; 
+    char * type = "";
         
     SEED ;
     make_pattern();
@@ -790,9 +807,11 @@ int main(int argc, char ** argv) {
                 switch (optarg[0]) {
                     case '2':
                         fill = Type2_fill_square ;
+                        type = "t1 Subsquare later -- alternating" ;
                         break ;
                     default:
                         fill = Type1_fill_square;
+                        type = "t2 Subsquare later -- columns" ;
                         break ;
                 }
                 break ;
@@ -800,12 +819,15 @@ int main(int argc, char ** argv) {
                 loop = SSLoop ;
                 switch (optarg[0]) {
                     case '3':
+						type = "s3 Diagonal Subsquare" ;
                         fill = SS3_fill_square ;
                         break ;
                     case '2':
+						type = "s2 Alternating Subsquare" ;
                         fill = SS2_fill_square ;
                         break ;
                     default:
+						type = "s1 Columns Subsquare" ;
                         fill = SS1_fill_square ;
                         break ;
                 }
@@ -814,18 +836,22 @@ int main(int argc, char ** argv) {
                 loop = SSLoop ;
                 switch (optarg[0]) {
                     case '3':
+						type = "w3 Diagonal Whole square" ;
                         fill = WS3_fill_square ;
                         break ;
                     case '2':
+						type = "w2 Alternating Whole square" ;
                         fill = WS2_fill_square ;
                         break ;
                     default:
+						type = "w1 Columns Whole square" ;
                         fill = WS1_fill_square ;
                         break ;
                 }
                 break ;
             case 'x':
                 loop = SSLoop ;
+				type = "x Columns X-square" ;
                 fill = X_fill_square ;
                 break ;
             case 'f':
@@ -840,6 +866,14 @@ int main(int argc, char ** argv) {
                 // distribution file
                 fdistribution = fopen( optarg, "w" ) ;
                 if ( fdistribution == NULL ) {
+                    fprintf( stderr, "Trouble opening distribution file %s\n",optarg) ;
+                    exit(1);
+                }
+                break ;
+            case 'g':
+                // summary file
+                fsummary = fopen( optarg, "w" ) ;
+                if ( fsummary == NULL ) {
                     fprintf( stderr, "Trouble opening distribution file %s\n",optarg) ;
                     exit(1);
                 }
@@ -862,6 +896,10 @@ int main(int argc, char ** argv) {
 			max_tries = m ;
 		}
     } 
+    
+    if ( fsummary ) {
+		fprintf( fsummary, "%s\n", type ) ;
+	}
     
     loop(fill) ;
     return 0 ;
