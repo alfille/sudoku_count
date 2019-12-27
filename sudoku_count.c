@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <signal.h>
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
@@ -23,6 +24,8 @@
 #define Zero(array) memset( array, 0, sizeof(array) ) ;
 
 clock_t start ;
+
+volatile int rupt = 0 ;
 
 FILE * fsolutions = NULL ;
 FILE * fdistribution = NULL ;
@@ -174,6 +177,10 @@ int Type1_fill_square( void ) {
     return -1 ;
 }
 
+void TypeLoopPrint( uint64_t count, uint64_t candidate, uint64_t good ) {
+	printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%g.2\t%.6f%%\t%.6f%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
+}	
+
 void TypeLoop( int (*fill)(void) ) {
     uint64_t bad=0 ;
     uint64_t candidate=0 ;
@@ -187,17 +194,13 @@ void TypeLoop( int (*fill)(void) ) {
                 ++good ;
                 print_square() ;
                 ++distribution[TOTALSIZE] ;
-                if ( 1 ) {
-                    uint64_t total = bad+candidate+good ;
-                    printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
-                }
+                TypeLoopPrint( count, candidate,good ) ;
                 break ;
             case TOTALSIZE:
                 ++candidate ;
                 ++distribution[TOTALSIZE] ;
                 if ( candidate % 10000 == 0 ) {
-                    uint64_t total = bad+candidate+good ;
-                    printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%g.2\n\t\t%.6f%%\t%.6f%%\n",bad,candidate,good,(double)(CLOCKS_PER_SEC*total)/(clock()-start),(100.*candidate)/total,(100.*good)/total) ;
+					TypeLoopPrint( count, candidate,good ) ;
                 }
                 break ;
             default:
@@ -205,10 +208,12 @@ void TypeLoop( int (*fill)(void) ) {
                 ++distribution[f] ;
                 break ;
         }
-        if ( count % 1000000 == 0 ) {
-			Distribution() ;
+        if ( rupt ) {
+			break ;
 		}
     }
+	TypeLoopPrint( count, candidate,good ) ;
+	Distribution() ;
 }
 
 int Type2_fill_square( void ) {
@@ -448,7 +453,7 @@ int SS3_fill_square( void ) {
     // bottom triangle
     for (sk=1;sk<SUBSIZE;++sk) {
 		for (si=sk;si<SUBSIZE;++si) {
-			sj = SUBSIZE-1+sk-si ; ;
+			sj = SUBSIZE-1+sk-si ;
 			// Top triangle
 			for(ssk=0;ssk<SUBSIZE;++ssk) {
 				for (ssi=0;ssi<=ssk;++ssi) {
@@ -482,6 +487,146 @@ int SS3_fill_square( void ) {
                 }
             }
         }
+    }
+    return TOTALSIZE ;
+}
+
+int WS1_fill_square( void ) {
+    int i,j,count=0 ;
+    int col_bits[SIZE] ;
+    int row_bits[SIZE] ;
+    int ss_bits[SUBSIZE][SUBSIZE] ;
+    
+    Zero(bit) ;
+    
+    // column bits culmulative
+    Zero( col_bits ) ;
+    
+    // row bits culmulative
+    Zero( row_bits ) ;
+    
+    // subsquare bits culmulative
+    Zero( ss_bits ) ;
+    
+    // Fill columns and rows
+    for (i=0;i<SIZE;++i) {
+        for (j=0;j<SIZE;++j) {
+			int si = i / SUBSIZE ;
+			int sj = j / SUBSIZE ;
+			int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
+			++count ;
+			if (b == 0 ) {
+				return count ;
+			}
+			row_bits[i] |= b ;
+			col_bits[j] |= b ;
+			ss_bits[si][sj] |= b ;
+			bit[i][j] = b ;
+        }
+    }
+    return TOTALSIZE ;
+}
+
+int WS2_fill_square( void ) {
+    int k ;
+    int i,j,count=0 ;
+    int col_bits[SIZE] ;
+    int row_bits[SIZE] ;
+    int ss_bits[SUBSIZE][SUBSIZE] ;
+    
+    Zero(bit) ;
+    
+    // column bits culmulative
+    Zero( col_bits ) ;
+    
+    // row bits culmulative
+    Zero( row_bits ) ;
+    
+    // subsquare bits culmulative
+    Zero( ss_bits ) ;
+    
+    // Fill columns and rows
+    for (k=0;k<SIZE;++k) {
+        for (i=k;i<SIZE;++i) {
+			int si = i / SUBSIZE ;
+			int sj = k / SUBSIZE ;
+			int b = find_valid_bit( col_bits[k]|row_bits[i]|ss_bits[si][sj] ) ;
+			++count ;
+			if (b == 0 ) {
+				return count ;
+			}
+			row_bits[i] |= b ;
+			col_bits[k] |= b ;
+			ss_bits[si][sj] |= b ;
+			bit[i][j] = b ;
+        }
+        for (j=k+1;j<SIZE;++j) {
+			int si = k / SUBSIZE ;
+			int sj = j / SUBSIZE ;
+			int b = find_valid_bit( col_bits[j]|row_bits[k]|ss_bits[i][sj] ) ;
+			++count ;
+			if (b == 0 ) {
+				return count ;
+			}
+			row_bits[k] |= b ;
+			col_bits[j] |= b ;
+			ss_bits[si][sj] |= b ;
+			bit[i][j] = b ;
+		}
+    }
+    return TOTALSIZE ;
+}
+
+int WS3_fill_square( void ) {
+    int i,k,count=0 ;
+    int col_bits[SIZE] ;
+    int row_bits[SIZE] ;
+    int ss_bits[SUBSIZE][SUBSIZE] ;
+    
+    Zero(bit) ;
+    
+    // column bits culmulative
+    Zero( col_bits ) ;
+    
+    // row bits culmulative
+    Zero( row_bits ) ;
+    
+    // subsquare bits culmulative
+    Zero( ss_bits ) ;
+    // Fill columns and rows
+    // Top triangle
+    for (k=0;k<SIZE;++k) {
+		for (i=0;i<=k;++i) {
+			int j = k-i ;
+			int si = i / SUBSIZE ;
+			int sj = j / SUBSIZE ;
+			int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
+			++count ;
+			if (b == 0 ) {
+				return count ;
+			}
+			row_bits[i] |= b ;
+			col_bits[j] |= b ;
+			ss_bits[si][sj] |= b ;
+			bit[i][j] = b ;
+		}
+	}
+    // bottom triangle
+    for (k=1;k<SIZE;++k) {
+		for (i=k;i<SIZE;++i) {
+			int j = SIZE-1+k-i ;
+			int si = i / SUBSIZE ;
+			int sj = j / SUBSIZE ;
+			int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
+			++count ;
+			if (b == 0 ) {
+				return count ;
+			}
+			row_bits[i] |= b ;
+			col_bits[j] |= b ;
+			ss_bits[si][sj] |= b ;
+			bit[i][j] = b ;
+		}
     }
     return TOTALSIZE ;
 }
@@ -554,6 +699,10 @@ int X_fill_square( void ) {
     return count ;
 }
 
+void SSLoopPrint( uint64_t count, uint64_t good, uint64_t totalcount ) {
+	printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+}	
+
 void SSLoop( int (*fill)(void) ) {
     uint64_t count ;
     uint64_t good = 0 ;
@@ -566,14 +715,21 @@ void SSLoop( int (*fill)(void) ) {
         if ( filled == TOTALSIZE ) {
             ++good ;
             print_square() ;
-            printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+            SSLoopPrint( count, good, totalcount ) ;
         } else if ( count % 100000 == 0 ) {
-            printf("count=%d, Good=%d\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+            SSLoopPrint( count, good, totalcount ) ;
         }
-        if ( count % 1000000 == 0 ) {
-			Distribution() ;
+        if ( rupt ) {
+			break ;
 		}
     }
+    SSLoopPrint( count, good, totalcount ) ;
+    Distribution() ;
+}
+
+void RuptHandler( int sig ) {
+	signal( sig, SIG_IGN ) ;
+	rupt = 1 ;
 }
 
 void help(char * prog) {
@@ -592,6 +748,9 @@ void help(char * prog) {
     "\t -s 1\tSearch subsquares by column, show failure point\n"
     "\t -s 2\tSearch subsquares column/row alternating, show failure point\n"
     "\t -s 3\tSearch subsquares diagonal approach, show failure point\n"
+    "\t -w 1\tSearch whole squares by column, show failure point\n"
+    "\t -w 2\tSearch whole squares column/row alternating, show failure point\n"
+    "\t -w 3\tSearch whole squares diagonal approach, show failure point\n"
     "\t -x  \tAlso main diagonals are unique (added constraint), show failure point\n"
     "\t -f filename\tPlace solutions in 'filename' (81 comma-separated values per line\n"
     "\t -d filename\tDistribution of tries (number of square aborted) every 1^6 tries\n"
@@ -613,9 +772,11 @@ int main(int argc, char ** argv) {
         
 	Zero(distribution) ;
 	
+	signal( SIGINT, RuptHandler ) ;
+	
     start = clock() ;
 
-    while ( (c = getopt( argc, argv, "hxt:s:f:d:" )) != -1 ) {
+    while ( (c = getopt( argc, argv, "hxt:w:s:f:d:" )) != -1 ) {
         switch(c) 
         {
             case 't':
@@ -640,6 +801,20 @@ int main(int argc, char ** argv) {
                         break ;
                     default:
                         fill = SS1_fill_square ;
+                        break ;
+                }
+                break ;
+            case 'w':
+                loop = SSLoop ;
+                switch (optarg[0]) {
+                    case '3':
+                        fill = WS3_fill_square ;
+                        break ;
+                    case '2':
+                        fill = WS2_fill_square ;
+                        break ;
+                    default:
+                        fill = WS1_fill_square ;
                         break ;
                 }
                 break ;
@@ -680,6 +855,5 @@ int main(int argc, char ** argv) {
     } 
     
     loop(fill) ;
-    Distribution() ;
     return 0 ;
 }
