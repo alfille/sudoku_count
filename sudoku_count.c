@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <errno.h>
 #include <signal.h>
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
@@ -570,12 +571,12 @@ int WS2_fill_square( void ) {
 			row_bits[i] |= b ;
 			col_bits[k] |= b ;
 			ss_bits[si][sj] |= b ;
-			bit[i][j] = b ;
+			bit[i][k] = b ;
         }
         for (j=k+1;j<SIZE;++j) {
 			int si = k / SUBSIZE ;
 			int sj = j / SUBSIZE ;
-			int b = find_valid_bit( col_bits[j]|row_bits[k]|ss_bits[i][sj] ) ;
+			int b = find_valid_bit( col_bits[j]|row_bits[k]|ss_bits[si][sj] ) ;
 			++count ;
 			if (b == 0 ) {
 				return count ;
@@ -583,7 +584,7 @@ int WS2_fill_square( void ) {
 			row_bits[k] |= b ;
 			col_bits[j] |= b ;
 			ss_bits[si][sj] |= b ;
-			bit[i][j] = b ;
+			bit[k][j] = b ;
 		}
     }
     return TOTALSIZE ;
@@ -799,7 +800,7 @@ int main(int argc, char ** argv) {
 	
     start = clock() ;
 
-    while ( (c = getopt( argc, argv, "hqxt:w:s:f:d:" )) != -1 ) {
+    while ( (c = getopt( argc, argv, "hqxt:w:s:f:d:g:" )) != -1 ) {
         switch(c) 
         {
             case 't':
@@ -859,6 +860,7 @@ int main(int argc, char ** argv) {
                 fsolutions = fopen( optarg, "w" ) ;
                 if ( fsolutions == NULL ) {
                     fprintf( stderr, "Trouble opening solutions file %s\n",optarg) ;
+                    perror(NULL);
                     exit(1);
                 }
                 break ;
@@ -867,6 +869,7 @@ int main(int argc, char ** argv) {
                 fdistribution = fopen( optarg, "w" ) ;
                 if ( fdistribution == NULL ) {
                     fprintf( stderr, "Trouble opening distribution file %s\n",optarg) ;
+                    perror(NULL);
                     exit(1);
                 }
                 break ;
@@ -875,6 +878,7 @@ int main(int argc, char ** argv) {
                 fsummary = fopen( optarg, "w" ) ;
                 if ( fsummary == NULL ) {
                     fprintf( stderr, "Trouble opening distribution file %s\n",optarg) ;
+                    perror(NULL);
                     exit(1);
                 }
                 break ;
