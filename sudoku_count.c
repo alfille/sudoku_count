@@ -74,7 +74,6 @@ int find_valid_bit( int mask ) {
     do {
         trial = pattern[ RANDOM % SIZE ] ;
     } while ( trial & mask ) ;
-    //printf("trial %x mask %x MATCH %x\n",trial,mask,mask&trial);
     return trial ;
 }
 
