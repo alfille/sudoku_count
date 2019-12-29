@@ -32,6 +32,8 @@ struct SearchOrder {
 
 struct SearchOrder order[ TOTALSIZE ] ; 
 
+char * key = "?" ;
+
 
 #define Zero(array) memset( array, 0, sizeof(array) ) ;
 
@@ -139,8 +141,8 @@ void print_square( void ) {
 void Distribution( void ) {
 	if ( fdistribution ) {
 		int d ;
-		fprintf(fdistribution,"%"PRIu64,distribution[0]) ;
-		for ( d=1;d<=TOTALSIZE;++d) {
+		fprintf(fdistribution,"%s",key) ;
+		for ( d=0;d<=TOTALSIZE;++d) {
 			fprintf(fdistribution,",%"PRIu64,distribution[d]) ; 
 		}
 		fprintf(fdistribution,"\n");
@@ -200,8 +202,8 @@ void TypeLoopPrint( uint64_t count, uint64_t candidate, uint64_t good ) {
 
 void TypeLoopSummary( uint64_t count, uint64_t candidate, uint64_t good ) {
 	if ( fsummary ) {
-		fprintf(fsummary,"Bad\tCandidate\tGood\tperSec\tCand%%\tGood%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
-		fprintf(fsummary,"%"PRIu64"\r%"PRIu64"\t%"PRIu64"\t%g.2\t%.6f%%\t%.6f%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
+		fprintf(fsummary,"Type,Bad,Candidate,Good,perSec,Cand%%,Good%%\n") ;
+		fprintf(fsummary,"%s,%"PRIu64",%"PRIu64",%"PRIu64",%g.2,%.6f%%,%.6f%%\n",key,count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
 }	}
 
 int constraints[SIZE][SIZE] ;
@@ -247,6 +249,33 @@ void find_next( int fill ) {
 	order[fill].i = besti ;
 	order[fill].j = bestj ;
 	AddConstraint(besti,bestj);
+}
+
+// 1 is bad, 0 is good
+int verify_order( void ) {
+	int fill ;
+	int check[SIZE][SIZE] ;
+	
+	Zero(check) ;
+	
+	for ( fill=0 ; fill<TOTALSIZE ; ++ fill ) {
+		int i = order[fill].i ;
+		int j = order[fill].j ;
+		if ( i < 0 || i >= SIZE ) {
+			fprintf(stderr,"Order slot %d (%d,%d) is a has a bad i value\n",fill,i,j) ;
+			return 1 ;
+		}
+		if ( j < 0 || j >= SIZE ) {
+			fprintf(stderr,"Order slot %d (%d,%d) is a has a bad j value\n",fill,i,j) ;
+			return 1 ;
+		}
+		if ( check[i][j] ) {
+			fprintf(stderr,"Order slot %d (%d,%d) has a repeat value first seen in slot %d\n",fill,i,j,check[i][j]-1) ;
+			return 1 ;
+		}
+		check[i][j] = fill+1 ;
+	}
+	return 0 ;
 }
 
 void print_order( void ) {
@@ -334,7 +363,6 @@ void TypeLoop( int (*fill)(void) ) {
     }
     TypeLoopSummary( count, candidate, good ) ;
 	TypeLoopPrint( count, candidate, good ) ;
-	Distribution() ;
 }
 
 int SS_fill_square( void ) {
@@ -624,8 +652,8 @@ void SSLoopPrint( uint64_t count, uint64_t good, uint64_t totalcount ) {
 
 void SSLoopSummary( uint64_t count, uint64_t good, uint64_t totalcount ) {
 	if ( fsummary ) {
-		fprintf(fsummary,"Count\tGood\tAverage\tperSec\tSuccess%%n") ;
-		fprintf(fsummary,"%"PRIu64"\t%"PRIu64"\t%g.1\t%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+		fprintf(fsummary,"Type,Count,Good,Average,perSec,Success%%n") ;
+		fprintf(fsummary,"%s,%"PRIu64",%"PRIu64",%g.1,%.1f,%.6f%%\n",key,count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
 }	}
 
 void SSLoop( int (*fill)(void) ) {
@@ -650,7 +678,6 @@ void SSLoop( int (*fill)(void) ) {
     }
     SSLoopSummary(count,good,totalcount);
     SSLoopPrint( count, good, totalcount ) ;
-    Distribution() ;
 }
 
 void RuptHandler( int sig ) {
@@ -706,8 +733,6 @@ int main(int argc, char ** argv) {
 	
 	WS1_order() ; //default
 	
-    start = clock() ;
-    
     while ( (c = getopt( argc, argv, "hoqx:t:w:s:f:d:g:" )) != -1 ) {
         switch(c) 
         {
@@ -716,19 +741,23 @@ int main(int argc, char ** argv) {
                 fill = Type_fill_square ;
                 switch (optarg[0]) {
                     case '4':
-                        type = "t4 Subsquare later -- least constraints" ;
+						key = "t4" ;
+                        type = "Subsquare later -- least constraints" ;
                         WS4_order() ;
                         break ;
                     case '3':
-                        type = "t3 Subsquare later -- diagonals" ;
+						key = "t3" ;
+                        type = "Subsquare later -- diagonals" ;
                         WS3_order() ;
                         break ;
                     case '2':
-                        type = "t2 Subsquare later -- alternating" ;
+						key = "t2" ;
+                        type = "Subsquare later -- alternating" ;
                         WS2_order() ;
                         break ;
                     default:
-                        type = "t2 Subsquare later -- columns" ;
+						key = "t1" ;
+                        type = "Subsquare later -- columns" ;
                         WS1_order() ;
                         break ;
                 }
@@ -738,15 +767,18 @@ int main(int argc, char ** argv) {
                 fill = SS_fill_square ;
                 switch (optarg[0]) {
                     case '3':
-						type = "s3 Diagonal Subsquare" ;
+						key = "s3" ;
+						type = "Diagonal Subsquare" ;
 						SS3_order() ;
                         break ;
                     case '2':
-						type = "s2 Alternating Subsquare" ;
+						key = "s2" ;
+						type = "Alternating Subsquare" ;
                         SS2_order() ;
                         break ;
                     default:
-						type = "s1 Columns Subsquare" ;
+						key = "s1" ;
+						type = "Columns Subsquare" ;
                         SS1_order() ;
                         break ;
                 }
@@ -756,19 +788,23 @@ int main(int argc, char ** argv) {
                 fill = SS_fill_square ;
                 switch (optarg[0]) {
                     case '4':
-						type = "w4 Least constrained Whole square" ;
+						key = "w4" ;
+						type = "Least constrained Whole square" ;
                         WS4_order() ;
                         break ;
                     case '3':
-						type = "w3 Diagonal Whole square" ;
+						key = "w3" ;
+						type = "Diagonal Whole square" ;
                         WS3_order() ;
                         break ;
                     case '2':
-						type = "w2 Alternating Whole square" ;
+						key = "w2" ;
+						type = "Alternating Whole square" ;
                         WS2_order() ;
                         break ;
                     default:
-						type = "w1 Columns Whole square" ;
+						key = "w1" ;
+						type = "Columns Whole square" ;
                         WS1_order() ;
                         break ;
                 }
@@ -779,19 +815,23 @@ int main(int argc, char ** argv) {
                 fill = X_fill_square ;
                 switch (optarg[0]) {
                     case '4':
-						type = "x4 Lest constrained with X" ;
+						key = "x4" ;
+						type = "Least constrained with X" ;
                         WS4_order() ;
                         break ;
                     case '3':
-						type = "x3 Diagonal with X" ;
+						key = "x3" ;
+						type = "Diagonal with X" ;
                         WS3_order() ;
                         break ;
                     case '2':
-						type = "x2 Alternating with X" ;
+						key = "x2" ;
+						type = "Alternating with X" ;
                         WS2_order() ;
                         break ;
                     default:
-						type = "x1 Columns wint X" ;
+						key = "x1" ;
+						type = "Columns wint X" ;
                         WS1_order() ;
                         break ;
                 }
@@ -845,15 +885,19 @@ int main(int argc, char ** argv) {
 		}
     } 
     
-    if ( fsummary ) {
-		fprintf( fsummary, "%s\n", type ) ;
+    if ( verify_order() ) {
+		fprintf(stderr,"Order verifying for %s - %s fails -- abort\n",key,type) ;
+		exit(1) ;
 	}
     
     if ( ordering ) {
-		printf( "%s\n", type ) ;
+		printf( "%s - %s\n", key,type ) ;
 		print_order() ;
 	}
     
+    start = clock() ;
+    
     loop(fill) ;
+	Distribution() ;
     return 0 ;
 }
