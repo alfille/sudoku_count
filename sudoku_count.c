@@ -22,6 +22,17 @@
 # define SUBSIZE (3) // sqrt of SIZE
 # define TOTALSIZE (SIZE*SIZE)
 
+# define MAXCONSTRAINT (3*SIZE)
+
+struct SearchOrder { 
+	int i; 
+	int j; 
+	} ;
+
+
+struct SearchOrder order[ TOTALSIZE ] ; 
+
+
 #define Zero(array) memset( array, 0, sizeof(array) ) ;
 
 clock_t start ;
@@ -136,8 +147,8 @@ void Distribution( void ) {
 	}
 }
 
-int Type1_fill_square( void ) {
-    int i,j ;
+int Type_fill_square( void ) {
+    int i, j, fill;
     int col_bits[SIZE] ;
     int row_bits[SIZE] ;
     
@@ -150,16 +161,17 @@ int Type1_fill_square( void ) {
     Zero( row_bits ) ;
     
     // Fill columns and rows
-    for (i=0;i<SIZE;++i) {
-        for (j=0;j<SIZE;++j) {
-            int b = find_valid_bit( col_bits[j]|row_bits[i] ) ;
-            if (b == 0 ) {
-                return i*SIZE+j ;
-            }
-            row_bits[i] |= b ;
-            col_bits[j] |= b ;
-            bit[i][j] = b ;
-        }
+    for ( fill = 0 ; fill < TOTALSIZE ; ++ fill ) {
+		int b ;
+		i = order[fill].i ;
+		j = order[fill].j ;
+		b = find_valid_bit( col_bits[j]|row_bits[i] ) ;
+		if (b == 0 ) {
+			return fill+1 ;
+		}
+		row_bits[i] |= b ;
+		col_bits[j] |= b ;
+		bit[i][j] = b ;
     }
     
     // Test subsquares
@@ -191,6 +203,103 @@ void TypeLoopSummary( uint64_t count, uint64_t candidate, uint64_t good ) {
 		fprintf(fsummary,"Bad\tCandidate\tGood\tperSec\tCand%%\tGood%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
 		fprintf(fsummary,"%"PRIu64"\r%"PRIu64"\t%"PRIu64"\t%g.2\t%.6f%%\t%.6f%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
 }	}
+
+int constraints[SIZE][SIZE] ;
+
+void AddConstraint( int i , int j ) {
+	int xi,xj ;
+
+	// column
+	for (xi=0 ; xi<SIZE ; ++xi ) {
+		++constraints[xi][j];
+	}
+	// row
+	for (xj=0 ; xj<SIZE ; ++xj ) {
+		++constraints[i][xj];
+	}
+	// subsquare
+	for (xi=0 ; xi<SUBSIZE ; ++xi ) {
+		int ii = SUBSIZE * (i/SUBSIZE) + xi ;
+		for (xj=0 ; xj<SUBSIZE ; ++xj ) {
+			int jj = SUBSIZE * (j/SUBSIZE) + xj ;
+			++constraints[ii][jj];
+		}
+	}
+	// push this slot off the map!
+	constraints[i][j] += MAXCONSTRAINT;
+}
+
+void find_next( int fill ) {
+	int low = MAXCONSTRAINT+1 ;
+	int i, j ;
+	int besti, bestj ;
+		
+	for( i=0 ; i<SIZE ; ++i ) {
+		for (j=0 ; j<SIZE ; ++j ) {
+			if ( constraints[i][j] < low ) {
+				besti = i;
+				bestj = j;
+				low = constraints[i][j] ;
+			}
+		}
+	}
+	
+	order[fill].i = besti ;
+	order[fill].j = bestj ;
+	AddConstraint(besti,bestj);
+}
+
+void print_order( void ) {
+	int fill ;
+	int i,j ;
+	int reorder[SIZE][SIZE] ;
+			
+	Zero( reorder ) ;
+	
+	for ( fill=0 ; fill<TOTALSIZE ; ++fill ) {
+		reorder[order[fill].i][order[fill].j] = fill ;
+	}
+	
+	// Initial blank
+	fprintf(stderr,"\n");
+
+	// top line
+	for ( j=0 ; j<SIZE ; ++j ) {
+		fprintf(stderr,"+-----");
+	}
+	// end of top line
+	fprintf(stderr,"+\n");
+	
+	for (i=0 ; i<SIZE ; ++i ) { // each row
+		for ( j=0 ; j<SIZE ; ++j ) {
+			int c = (j%SUBSIZE)?':':'|' ;
+			fprintf(stderr,"%c%4d ",c,reorder[i][j]);
+		}
+		// end of row
+		fprintf(stderr,"|\n");
+		
+		// Separator line
+		for ( j=0 ; j<SIZE ; ++j ) {
+			int c = ((i+1)%SUBSIZE)?' ':'-';
+			fprintf(stderr,"+%c-%c-%c",c,c,c);
+		}
+		// end of separator
+		fprintf(stderr,"+\n");
+	} 
+
+	// Final blank
+	fprintf(stderr,"\n");
+}   
+
+void WS4_order( void ) {
+	int fill ;
+
+	Zero( constraints ) ;
+	
+	for ( fill=0 ; fill<TOTALSIZE ; ++fill ) {
+		find_next( fill ) ;
+	}
+}
 
 void TypeLoop( int (*fill)(void) ) {
     uint64_t bad=0 ;
@@ -224,67 +333,12 @@ void TypeLoop( int (*fill)(void) ) {
 		}
     }
     TypeLoopSummary( count, candidate, good ) ;
-	TypeLoopPrint( count, candidate,good ) ;
+	TypeLoopPrint( count, candidate, good ) ;
 	Distribution() ;
 }
 
-int Type2_fill_square( void ) {
-    int i,j,k,count=0 ;
-    int col_bits[SIZE] ;
-    int row_bits[SIZE] ;
-    
-    Zero(bit) ;
-    
-    // column bits culmulative
-    Zero( col_bits ) ;
-    
-    // row bits culmulative
-    Zero( row_bits ) ;
-    
-    // Fill columns and rows
-    for (k=0;k<SIZE;++k) {
-        for (j=k;j<SIZE;++j) {
-            int b = find_valid_bit( col_bits[j]|row_bits[k] ) ;
-            ++count ;
-            if (b == 0 ) {
-                return count ;
-            }
-            row_bits[k] |= b ;
-            col_bits[j] |= b ;
-            bit[k][j] = b ;
-        }
-        for (i=k+1;i<SIZE;++i) {
-            int b = find_valid_bit( col_bits[k]|row_bits[i] ) ;
-            ++count ;
-            if (b == 0 ) {
-                return count ;
-            }
-            row_bits[i] |= b ;
-            col_bits[k] |= b ;
-            bit[i][k] = b ;
-        }
-    }
-    
-    // Test subsquares
-    for( i=0 ; i<SIZE ; i+=SUBSIZE) {
-        for( j=0 ; j<SIZE ; j+=SUBSIZE ) {
-            int sub_bits = 0 ;
-            int si,sj;
-            for (si=0 ; si<SUBSIZE ; ++si ) {
-                for (sj=0 ; sj<SUBSIZE ; ++sj ) {
-                    sub_bits |= bit[i+si][j+sj] ;
-                }
-            }
-            if ( sub_bits != full_pattern ) {
-                return TOTALSIZE ;
-            }
-        }
-    } 
-        return -1 ;
-}
-
-int SS1_fill_square( void ) {
-    int si,sj,ssi,ssj,count=0 ;
+int SS_fill_square( void ) {
+    int fill ;
     int col_bits[SIZE] ;
     int row_bits[SIZE] ;
     int ss_bits[SUBSIZE][SUBSIZE] ;
@@ -300,6 +354,26 @@ int SS1_fill_square( void ) {
     // subsquare bits culmulative
     Zero( ss_bits ) ;
     
+    for ( fill=0 ; fill<TOTALSIZE ; ++fill ) {
+		int i = order[fill].i ;
+		int j = order[fill].j ;
+		int si = i / SUBSIZE ;
+		int sj = j / SUBSIZE ;
+		int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
+		if (b == 0 ) {
+			return fill+1 ;
+		}
+		row_bits[i] |= b ;
+		col_bits[j] |= b ;
+		ss_bits[si][sj] |= b ;
+		bit[i][j] = b ;
+	}
+    return TOTALSIZE ;
+}
+
+void SS1_order( void ) {
+    int si,sj,ssi,ssj,filled=-1 ;
+
     // Fill columns and rows
     for (si=0;si<SUBSIZE;++si) {
         for (sj=0;sj<SUBSIZE;++sj) {
@@ -307,40 +381,19 @@ int SS1_fill_square( void ) {
                 for ( ssj=0;ssj<SUBSIZE;++ssj) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*sj+ssj ;
-                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
-                    ++count ;
-                    if (b == 0 ) {
-                        return count ;
-                    }
-                    row_bits[i] |= b ;
-                    col_bits[j] |= b ;
-                    ss_bits[si][sj] |= b ;
-                    bit[i][j] = b ;
-                }
-            }
-        }
-    }
-    return TOTALSIZE ;
+                    ++ filled ;
+                    order[filled].i = i ;
+                    order[filled].j = j ;
+				}
+			}
+		}
+	}
 }
 
-int SS2_fill_square( void ) {
+void SS2_order( void ) {
     int k,sk ;
-    int si,sj,ssi,ssj,count=0 ;
-    int col_bits[SIZE] ;
-    int row_bits[SIZE] ;
-    int ss_bits[SUBSIZE][SUBSIZE] ;
-    
-    Zero(bit) ;
-    
-    // column bits culmulative
-    Zero( col_bits ) ;
-    
-    // row bits culmulative
-    Zero( row_bits ) ;
-    
-    // subsquare bits culmulative
-    Zero( ss_bits ) ;
-    
+    int si,sj,ssi,ssj,fill=-1 ;
+
     // Fill columns and rows
     for (k=0;k<SUBSIZE;++k) {
         for (si=k;si<SUBSIZE;++si) {
@@ -348,28 +401,16 @@ int SS2_fill_square( void ) {
                 for (ssi=sk;ssi<SUBSIZE;++ssi) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*k+sk ;
-                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][k] ) ;
-					++count ;
-                    if (b == 0 ) {
-                        return count ;
-                    }
-                    row_bits[i] |= b ;
-                    col_bits[j] |= b ;
-                    ss_bits[si][k] |= b ;
-                    bit[i][j] = b ;
+					++fill ;
+					order[fill].i = i ;
+					order[fill].j = j ;
                 }
                 for ( ssj=sk+1;ssj<SUBSIZE;++ssj) {
                     int i = SUBSIZE*si+sk ;
                     int j = SUBSIZE*k+ssj ;
-                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][k] ) ;
-					++count ;
-                    if (b == 0 ) {
-                        return count ;
-                    }
-                    row_bits[i] |= b ;
-                    col_bits[j] |= b ;
-                    ss_bits[si][k] |= b ;
-                    bit[i][j] = b ;
+					++fill ;
+					order[fill].i = i ;
+					order[fill].j = j ;
                 }
             }
         }
@@ -378,51 +419,25 @@ int SS2_fill_square( void ) {
                 for (ssi=sk;ssi<SUBSIZE;++ssi) {
                     int i = SUBSIZE*k+ssi ;
                     int j = SUBSIZE*sj+sk ;
-                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[k][sj] ) ;
-					++count ;
-                    if (b == 0 ) {
-                        return count ;
-                    }
-                    row_bits[i] |= b ;
-                    col_bits[j] |= b ;
-                    ss_bits[k][sj] |= b ;
-                    bit[i][j] = b ;
+					++fill ;
+					order[fill].i = i ;
+					order[fill].j = j ;
                 }
                 for ( ssj=sk+1;ssj<SUBSIZE;++ssj) {
                     int i = SUBSIZE*k+sk ;
                     int j = SUBSIZE*sj+ssj ;
-                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[k][sj] ) ;
-					++count ;
-                    if (b == 0 ) {
-                        return count ;
-                    }
-                    row_bits[i] |= b ;
-                    col_bits[j] |= b ;
-                    ss_bits[k][sj] |= b ;
-                    bit[i][j] = b ;
+					++fill ;
+					order[fill].i = i ;
+					order[fill].j = j ;
                 }
             }
         }
     }
-    return TOTALSIZE ;
 }
 
-int SS3_fill_square( void ) {
-    int sk,ssk,si,sj,ssi,count=0 ;
-    int col_bits[SIZE] ;
-    int row_bits[SIZE] ;
-    int ss_bits[SUBSIZE][SUBSIZE] ;
-    
-    Zero(bit) ;
-    
-    // column bits culmulative
-    Zero( col_bits ) ;
-    
-    // row bits culmulative
-    Zero( row_bits ) ;
-    
-    // subsquare bits culmulative
-    Zero( ss_bits ) ;
+void SS3_order( void ) {
+    int sk,ssk,si,sj,ssi,fill=-1 ;
+
     // Fill columns and rows
     // Top triangle
     for (sk=0;sk<SUBSIZE;++sk) {
@@ -433,15 +448,9 @@ int SS3_fill_square( void ) {
 				for (ssi=0;ssi<=ssk;++ssi) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*sj+ssk-ssi ;
-                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
-                    ++count ;
-                    if (b == 0 ) {
-                        return count ;
-                    }
-                    row_bits[i] |= b ;
-                    col_bits[j] |= b ;
-                    ss_bits[si][sj] |= b ;
-                    bit[i][j] = b ;
+					++fill ;
+					order[fill].i = i ;
+					order[fill].j = j ;
                 }
             }
             // bottom triangle
@@ -449,15 +458,9 @@ int SS3_fill_square( void ) {
 				for (ssi=ssk;ssi<SUBSIZE;++ssi) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*sj+SUBSIZE-1+ssk-ssi ;
-                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
-                    ++count ;
-                    if (b == 0 ) {
-                        return count ;
-                    }
-                    row_bits[i] |= b ;
-                    col_bits[j] |= b ;
-                    ss_bits[si][sj] |= b ;
-                    bit[i][j] = b ;
+					++fill ;
+					order[fill].i = i ;
+					order[fill].j = j ;
                 }
             }
         }
@@ -471,15 +474,9 @@ int SS3_fill_square( void ) {
 				for (ssi=0;ssi<=ssk;++ssi) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*sj+ssk-ssi ;
-                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
-                    ++count ;
-                    if (b == 0 ) {
-                        return count ;
-                    }
-                    row_bits[i] |= b ;
-                    col_bits[j] |= b ;
-                    ss_bits[si][sj] |= b ;
-                    bit[i][j] = b ;
+					++fill ;
+					order[fill].i = i ;
+					order[fill].j = j ;
                 }
             }
             // bottom triangle
@@ -487,165 +484,78 @@ int SS3_fill_square( void ) {
 				for (ssi=ssk;ssi<SUBSIZE;++ssi) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*sj+SUBSIZE-1+ssk-ssi ;
-                    int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
-                    ++count ;
-                    if (b == 0 ) {
-                        return count ;
-                    }
-                    row_bits[i] |= b ;
-                    col_bits[j] |= b ;
-                    ss_bits[si][sj] |= b ;
-                    bit[i][j] = b ;
+					++fill ;
+					order[fill].i = i ;
+					order[fill].j = j ;
                 }
             }
         }
     }
-    return TOTALSIZE ;
 }
 
-int WS1_fill_square( void ) {
-    int i,j,count=0 ;
-    int col_bits[SIZE] ;
-    int row_bits[SIZE] ;
-    int ss_bits[SUBSIZE][SUBSIZE] ;
-    
-    Zero(bit) ;
-    
-    // column bits culmulative
-    Zero( col_bits ) ;
-    
-    // row bits culmulative
-    Zero( row_bits ) ;
-    
-    // subsquare bits culmulative
-    Zero( ss_bits ) ;
+void WS1_order( void ) {
+    int i,j,fill=-1 ;
     
     // Fill columns and rows
     for (i=0;i<SIZE;++i) {
         for (j=0;j<SIZE;++j) {
-			int si = i / SUBSIZE ;
-			int sj = j / SUBSIZE ;
-			int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
-			++count ;
-			if (b == 0 ) {
-				return count ;
-			}
-			row_bits[i] |= b ;
-			col_bits[j] |= b ;
-			ss_bits[si][sj] |= b ;
-			bit[i][j] = b ;
+			++fill ;
+			order[fill].i = i ;
+			order[fill].j = j ;
         }
     }
-    return TOTALSIZE ;
 }
 
-int WS2_fill_square( void ) {
+void WS2_order( void ) {
     int k ;
-    int i,j,count=0 ;
-    int col_bits[SIZE] ;
-    int row_bits[SIZE] ;
-    int ss_bits[SUBSIZE][SUBSIZE] ;
-    
-    Zero(bit) ;
-    
-    // column bits culmulative
-    Zero( col_bits ) ;
-    
-    // row bits culmulative
-    Zero( row_bits ) ;
-    
-    // subsquare bits culmulative
-    Zero( ss_bits ) ;
+    int i,j,fill=-1 ;
     
     // Fill columns and rows
     for (k=0;k<SIZE;++k) {
         for (i=k;i<SIZE;++i) {
 			int si = i / SUBSIZE ;
 			int sj = k / SUBSIZE ;
-			int b = find_valid_bit( col_bits[k]|row_bits[i]|ss_bits[si][sj] ) ;
-			++count ;
-			if (b == 0 ) {
-				return count ;
-			}
-			row_bits[i] |= b ;
-			col_bits[k] |= b ;
-			ss_bits[si][sj] |= b ;
-			bit[i][k] = b ;
+			++fill ;
+			order[fill].i = i ;
+			order[fill].j = k ;
         }
         for (j=k+1;j<SIZE;++j) {
 			int si = k / SUBSIZE ;
 			int sj = j / SUBSIZE ;
-			int b = find_valid_bit( col_bits[j]|row_bits[k]|ss_bits[si][sj] ) ;
-			++count ;
-			if (b == 0 ) {
-				return count ;
-			}
-			row_bits[k] |= b ;
-			col_bits[j] |= b ;
-			ss_bits[si][sj] |= b ;
-			bit[k][j] = b ;
+			++fill ;
+			order[fill].i = k ;
+			order[fill].j = j ;
 		}
     }
-    return TOTALSIZE ;
 }
 
-int WS3_fill_square( void ) {
-    int i,k,count=0 ;
-    int col_bits[SIZE] ;
-    int row_bits[SIZE] ;
-    int ss_bits[SUBSIZE][SUBSIZE] ;
-    
-    Zero(bit) ;
-    
-    // column bits culmulative
-    Zero( col_bits ) ;
-    
-    // row bits culmulative
-    Zero( row_bits ) ;
-    
-    // subsquare bits culmulative
-    Zero( ss_bits ) ;
+void WS3_order( void ) {
+    int i,k,fill=-1 ;
+
     // Fill columns and rows
     // Top triangle
     for (k=0;k<SIZE;++k) {
 		for (i=0;i<=k;++i) {
 			int j = k-i ;
-			int si = i / SUBSIZE ;
-			int sj = j / SUBSIZE ;
-			int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
-			++count ;
-			if (b == 0 ) {
-				return count ;
-			}
-			row_bits[i] |= b ;
-			col_bits[j] |= b ;
-			ss_bits[si][sj] |= b ;
-			bit[i][j] = b ;
+			++fill ;
+			order[fill].i = i ;
+			order[fill].j = j ;
 		}
 	}
     // bottom triangle
     for (k=1;k<SIZE;++k) {
 		for (i=k;i<SIZE;++i) {
 			int j = SIZE-1+k-i ;
-			int si = i / SUBSIZE ;
-			int sj = j / SUBSIZE ;
-			int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
-			++count ;
-			if (b == 0 ) {
-				return count ;
-			}
-			row_bits[i] |= b ;
-			col_bits[j] |= b ;
-			ss_bits[si][sj] |= b ;
-			bit[i][j] = b ;
+			++fill ;
+			order[fill].i = i ;
+			order[fill].j = j ;
 		}
     }
-    return TOTALSIZE ;
 }
 
 // big diagonals as well
 int X_fill_square( void ) {
-    int si,sj,ssi,ssj,count=0 ;
+    int si,sj,ssi,ssj,fill ;
     int col_bits[SIZE] ;
     int row_bits[SIZE] ;
     int ss_bits[SUBSIZE][SUBSIZE] ;
@@ -663,52 +573,48 @@ int X_fill_square( void ) {
     Zero( ss_bits ) ;
     
     // Fill columns and rows
-    for (si=0;si<SUBSIZE;++si) {
-        for (sj=0;sj<SUBSIZE;++sj) {
-            for (ssi=0;ssi<SUBSIZE;++ssi) {
-                for ( ssj=0;ssj<SUBSIZE;++ssj,++count) {
-                    int i = SUBSIZE*si+ssi ;
-                    int j = SUBSIZE*sj+ssj ;
-                    int m = col_bits[j]|row_bits[i]|ss_bits[si][sj] ;
-                    int b ;
-                    if ( i != j ) { // not main diagonal
-                        if ( SIZE-i != j ) { // not 2nd diagonal
-                            b = find_valid_bit( m ) ;
-                            if (b == 0 ) {
-                                return count ;
-                            }
-                        } else { // second diagonal
-                            b = find_valid_bit( m|diag2 ) ;
-                            if (b == 0 ) {
-                                return count ;
-                            }
-                            diag2|=b ;
-                        }
-                    } else {
-                        if ( SIZE-i != j ) { // not any diagonal
-                            b = find_valid_bit( m|diag1 ) ;
-                            if (b == 0 ) {
-                                return count ;
-                            }
-                            diag1 |= b ;
-                        } else { // Both diagonals (center)
-                            b = find_valid_bit( m|diag2|diag1 ) ;
-                            if (b == 0 ) {
-                                return count ;
-                            }
-                            diag2|=b ;
-                            diag1|=b ;
-                        }
-                    }
-                    row_bits[i] |= b ;
-                    col_bits[j] |= b ;
-                    ss_bits[si][sj] |= b ;
-                    bit[i][j] = b ;
-                }
-            }
-        }
+    for ( fill=0 ; fill < TOTALSIZE ; ++fill ) {
+		int i = order[fill].i ;
+		int j = order[fill].j ;
+		int si = i / SUBSIZE ;
+		int sj = j / SUBSIZE ;
+		int m = col_bits[j]|row_bits[i]|ss_bits[si][sj] ;
+		int b ;
+		if ( i != j ) { // not main diagonal
+			if ( SIZE-i != j ) { // not any diagonal
+				b = find_valid_bit( m ) ;
+				if (b == 0 ) {
+					return fill+1 ;
+				}
+			} else { // second diagonal
+				b = find_valid_bit( m|diag2 ) ;
+				if (b == 0 ) {
+					return fill+1 ;
+				}
+				diag2|=b ;
+			}
+		} else {
+			if ( SIZE-i != j ) { // first diagonal
+				b = find_valid_bit( m|diag1 ) ;
+				if (b == 0 ) {
+					return fill+1 ;
+				}
+				diag1 |= b ;
+			} else { // Both diagonals (center)
+				b = find_valid_bit( m|diag2|diag1 ) ;
+				if (b == 0 ) {
+					return fill+1 ;
+				}
+				diag2|=b ;
+				diag1|=b ;
+			}
+		}
+		row_bits[i] |= b ;
+		col_bits[j] |= b ;
+		ss_bits[si][sj] |= b ;
+		bit[i][j] = b ;
     }
-    return count ;
+    return TOTALSIZE ;
 }
 
 void SSLoopPrint( uint64_t count, uint64_t good, uint64_t totalcount ) {
@@ -763,19 +669,19 @@ void help(char * prog) {
     "%s [options] [attempts]\n"
     "\n",
     "options:\n"
-    "\t -t 1\tSearch columns first, then test for subsquares (default)\n"
-    "\t -t 2\tSearch columns/row alternating, then test for subsquares\n"
-    "\t -s 1\tSearch subsquares by column, show failure point\n"
-    "\t -s 2\tSearch subsquares column/row alternating, show failure point\n"
-    "\t -s 3\tSearch subsquares diagonal approach, show failure point\n"
-    "\t -w 1\tSearch whole squares by column, show failure point\n"
-    "\t -w 2\tSearch whole squares column/row alternating, show failure point\n"
-    "\t -w 3\tSearch whole squares diagonal approach, show failure point\n"
-    "\t -x  \tAlso main diagonals are unique (added constraint), show failure point\n"
+    "\t -t [1|2|3|4]\tSearch columns first, then test for subsquares (default)\n"
+    "\t -s [1|2|3]\tSearch subsquares, show failure point\n"
+    "\t -w [1|2|3|4]\tSearch whole square, show failure point\n"
+    "\t -x [1|2|3|4]\tAlso main diagonals are unique (added constraint), show failure point\n"
+    "\t\t 1 -- by column\n"
+    "\t\t 2 -- alternating column/row\n"
+    "\t\t 3 -- diagonal\n"
+    "\t\t 4 -- scattered -- least constrained\n"
     "\t -f filename\tPlace solutions in 'filename' (81 comma-separated values per line\n"
     "\t -d filename\tDistribution of tries (number of square aborted) every 1^6 tries\n"
     "\t -g filename\tPlace summary data in filename\n"
     "\t -q quiet\tSuppress most printing\n"
+    "\t -o Show ordering\n"
     "\t -h  \tShow these instructions\n"
     "\n"
     "Attempts: number of boards to try (unlimited if omitted)\n",
@@ -785,10 +691,11 @@ void help(char * prog) {
 
 int main(int argc, char ** argv) {
     int c ; 
+    int ordering = 0 ;
     
-    void (*loop)( int (*fill)(void) ) = TypeLoop ; 
-    int (*fill)(void) = Type1_fill_square ; 
-    char * type = "";
+    void (*loop)( int (*fill)(void) ) = TypeLoop ; //default
+    int (*fill)(void) = Type_fill_square ; //default
+    char * type = "Unspecified -- assume t1";
         
     SEED ;
     make_pattern();
@@ -797,55 +704,72 @@ int main(int argc, char ** argv) {
 	
 	signal( SIGINT, RuptHandler ) ;
 	
+	WS1_order() ; //default
+	
     start = clock() ;
-
-    while ( (c = getopt( argc, argv, "hqxt:w:s:f:d:g:" )) != -1 ) {
+    
+    while ( (c = getopt( argc, argv, "hoqx:t:w:s:f:d:g:" )) != -1 ) {
         switch(c) 
         {
             case 't':
                 loop = TypeLoop ;
+                fill = Type_fill_square ;
                 switch (optarg[0]) {
+                    case '4':
+                        type = "t4 Subsquare later -- least constraints" ;
+                        WS4_order() ;
+                        break ;
+                    case '3':
+                        type = "t3 Subsquare later -- diagonals" ;
+                        WS3_order() ;
+                        break ;
                     case '2':
-                        fill = Type2_fill_square ;
-                        type = "t1 Subsquare later -- alternating" ;
+                        type = "t2 Subsquare later -- alternating" ;
+                        WS2_order() ;
                         break ;
                     default:
-                        fill = Type1_fill_square;
                         type = "t2 Subsquare later -- columns" ;
+                        WS1_order() ;
                         break ;
                 }
                 break ;
             case 's':
                 loop = SSLoop ;
+                fill = SS_fill_square ;
                 switch (optarg[0]) {
                     case '3':
 						type = "s3 Diagonal Subsquare" ;
-                        fill = SS3_fill_square ;
+						SS3_order() ;
                         break ;
                     case '2':
 						type = "s2 Alternating Subsquare" ;
-                        fill = SS2_fill_square ;
+                        SS2_order() ;
                         break ;
                     default:
 						type = "s1 Columns Subsquare" ;
-                        fill = SS1_fill_square ;
+                        SS1_order() ;
                         break ;
                 }
                 break ;
             case 'w':
                 loop = SSLoop ;
+                fill = SS_fill_square ;
                 switch (optarg[0]) {
+                    case '4':
+						type = "w4 Least constrained Whole square" ;
+                        WS4_order() ;
+                        break ;
                     case '3':
 						type = "w3 Diagonal Whole square" ;
-                        fill = WS3_fill_square ;
+                        WS3_order() ;
                         break ;
                     case '2':
 						type = "w2 Alternating Whole square" ;
-                        fill = WS2_fill_square ;
+                        WS2_order() ;
                         break ;
                     default:
 						type = "w1 Columns Whole square" ;
-                        fill = WS1_fill_square ;
+                        WS1_order() ;
                         break ;
                 }
                 break ;
@@ -853,6 +777,24 @@ int main(int argc, char ** argv) {
                 loop = SSLoop ;
 				type = "x Columns X-square" ;
                 fill = X_fill_square ;
+                switch (optarg[0]) {
+                    case '4':
+						type = "x4 Lest constrained with X" ;
+                        WS4_order() ;
+                        break ;
+                    case '3':
+						type = "x3 Diagonal with X" ;
+                        WS3_order() ;
+                        break ;
+                    case '2':
+						type = "x2 Alternating with X" ;
+                        WS2_order() ;
+                        break ;
+                    default:
+						type = "x1 Columns wint X" ;
+                        WS1_order() ;
+                        break ;
+                }
                 break ;
             case 'f':
                 // solution file
@@ -881,6 +823,9 @@ int main(int argc, char ** argv) {
                     exit(1);
                 }
                 break ;
+			case 'o':
+				ordering = 1 ;
+				break ;
 			case 'q':
 				quiet = 1 ;
 				break ;
@@ -902,6 +847,11 @@ int main(int argc, char ** argv) {
     
     if ( fsummary ) {
 		fprintf( fsummary, "%s\n", type ) ;
+	}
+    
+    if ( ordering ) {
+		printf( "%s\n", type ) ;
+		print_order() ;
 	}
     
     loop(fill) ;
