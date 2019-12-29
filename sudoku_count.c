@@ -437,7 +437,7 @@ int SS_fill_square_backup( void ) {
         }
 
         // See if a backup spot
-        if ( (fill > SIZE) && (b|m != full_pattern) ) {
+        if ( (fill > SIZE) && ((b|m) != full_pattern) ) {
             fill_copy = fill ;
             memcpy( col_bits_copy, col_bits , sizeof(col_bits_copy) ) ;
             memcpy( row_bits_copy, row_bits , sizeof(row_bits_copy) ) ;
@@ -779,7 +779,7 @@ void help(char * prog) {
     "\tSee https:\\github.com/alfille/sudoku_count\n"
     "\n"
     "%s [options] [attempts]\n"
-    "\n",
+    "\n"
     "options:\n"
     "\t -t [1|2|3|4]\tSearch columns first, then test for subsquares (default)\n"
     "\t -s [1|2|3]\tSearch subsquares, show failure point\n"
