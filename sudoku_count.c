@@ -25,15 +25,15 @@
 # define MAXCONSTRAINT (3*SIZE)
 
 struct SearchOrder { 
-	int i; 
-	int j; 
-	} ;
+    int i; 
+    int j; 
+    } ;
 
 
 struct SearchOrder order[ TOTALSIZE ] ; 
 
 char * key = "?" ;
-
+char * back = " " ;
 
 #define Zero(array) memset( array, 0, sizeof(array) ) ;
 
@@ -91,62 +91,62 @@ int find_valid_bit( int mask ) {
 }
 
 void print_square( void ) {
-	if ( !quiet ) {
-		int i ;
-		int j ;
-		
-		// print to file?
-		if ( fsolutions ) {
-			fprintf(fsolutions,"%X",reverse_pattern(bit[0][0]));
-			for (i=0;i<SIZE;++i) {
-				for (j=1;j<SIZE;++j) {
-					fprintf(fsolutions,",%X",reverse_pattern(bit[i][j]));
-				}
-			}
-			fprintf(fsolutions,"\n");
-		}
-		
-		// Initial blank
-		fprintf(stderr,"\n");
+    if ( !quiet ) {
+        int i ;
+        int j ;
+        
+        // print to file?
+        if ( fsolutions ) {
+            fprintf(fsolutions,"%X",reverse_pattern(bit[0][0]));
+            for (i=0;i<SIZE;++i) {
+                for (j=1;j<SIZE;++j) {
+                    fprintf(fsolutions,",%X",reverse_pattern(bit[i][j]));
+                }
+            }
+            fprintf(fsolutions,"\n");
+        }
+        
+        // Initial blank
+        fprintf(stderr,"\n");
 
-		// top line
-		for ( j=0 ; j<SIZE ; ++j ) {
-			fprintf(stderr,"+---");
-		}
-		// end of top line
-		fprintf(stderr,"+\n");
-		
-		for (i=0 ; i<SIZE ; ++i ) { // each row
-			for ( j=0 ; j<SIZE ; ++j ) {
-				int c = (j%SUBSIZE)?':':'|' ;
-				fprintf(stderr,"%c%2X ",c,reverse_pattern(bit[i][j]));
-			}
-			// end of row
-			fprintf(stderr,"|\n");
-			
-			// Separator line
-			for ( j=0 ; j<SIZE ; ++j ) {
-				int c = ((i+1)%SUBSIZE)?' ':'-';
-				fprintf(stderr,"+%c-%c",c,c);
-			}
-			// end of separator
-			fprintf(stderr,"+\n");
-		} 
+        // top line
+        for ( j=0 ; j<SIZE ; ++j ) {
+            fprintf(stderr,"+---");
+        }
+        // end of top line
+        fprintf(stderr,"+\n");
+        
+        for (i=0 ; i<SIZE ; ++i ) { // each row
+            for ( j=0 ; j<SIZE ; ++j ) {
+                int c = (j%SUBSIZE)?':':'|' ;
+                fprintf(stderr,"%c%2X ",c,reverse_pattern(bit[i][j]));
+            }
+            // end of row
+            fprintf(stderr,"|\n");
+            
+            // Separator line
+            for ( j=0 ; j<SIZE ; ++j ) {
+                int c = ((i+1)%SUBSIZE)?' ':'-';
+                fprintf(stderr,"+%c-%c",c,c);
+            }
+            // end of separator
+            fprintf(stderr,"+\n");
+        } 
 
-		// Final blank
-		fprintf(stderr,"\n");
-	}
+        // Final blank
+        fprintf(stderr,"\n");
+    }
 }   
 
 void Distribution( void ) {
-	if ( fdistribution ) {
-		int d ;
-		fprintf(fdistribution,"%s",key) ;
-		for ( d=0;d<=TOTALSIZE;++d) {
-			fprintf(fdistribution,",%"PRIu64,distribution[d]) ; 
-		}
-		fprintf(fdistribution,"\n");
-	}
+    if ( fdistribution ) {
+        int d ;
+        fprintf(fdistribution,"%s%s",key,back) ;
+        for ( d=0;d<=TOTALSIZE;++d) {
+            fprintf(fdistribution,",%"PRIu64,distribution[d]) ; 
+        }
+        fprintf(fdistribution,"\n");
+    }
 }
 
 int Type_fill_square( void ) {
@@ -164,16 +164,16 @@ int Type_fill_square( void ) {
     
     // Fill columns and rows
     for ( fill = 0 ; fill < TOTALSIZE ; ++ fill ) {
-		int b ;
-		i = order[fill].i ;
-		j = order[fill].j ;
-		b = find_valid_bit( col_bits[j]|row_bits[i] ) ;
-		if (b == 0 ) {
-			return fill+1 ;
-		}
-		row_bits[i] |= b ;
-		col_bits[j] |= b ;
-		bit[i][j] = b ;
+        int b ;
+        i = order[fill].i ;
+        j = order[fill].j ;
+        b = find_valid_bit( col_bits[j]|row_bits[i] ) ;
+        if (b == 0 ) {
+            return fill+1 ;
+        }
+        row_bits[i] |= b ;
+        col_bits[j] |= b ;
+        bit[i][j] = b ;
     }
     
     // Test subsquares
@@ -196,138 +196,138 @@ int Type_fill_square( void ) {
 }
 
 void TypeLoopPrint( uint64_t count, uint64_t candidate, uint64_t good ) {
-	if ( !quiet ) {
-		printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%g.2\t%.6f%%\t%.6f%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
-}	}
+    if ( !quiet ) {
+        printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%g.2\t%.6f%%\t%.6f%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
+}   }
 
 void TypeLoopSummary( uint64_t count, uint64_t candidate, uint64_t good ) {
-	if ( fsummary ) {
-		fprintf(fsummary,"Type,Bad,Candidate,Good,perSec,Cand%%,Good%%\n") ;
-		fprintf(fsummary,"%s,%"PRIu64",%"PRIu64",%"PRIu64",%g.2,%.6f%%,%.6f%%\n",key,count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
-}	}
+    if ( fsummary ) {
+        fprintf(fsummary,"Type,Bad,Candidate,Good,perSec,Cand%%,Good%%\n") ;
+        fprintf(fsummary,"%s%s,%"PRIu64",%"PRIu64",%"PRIu64",%g.2,%.6f%%,%.6f%%\n",key,back,count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
+}   }
 
 int constraints[SIZE][SIZE] ;
 
 void AddConstraint( int i , int j ) {
-	int xi,xj ;
+    int xi,xj ;
 
-	// column
-	for (xi=0 ; xi<SIZE ; ++xi ) {
-		++constraints[xi][j];
-	}
-	// row
-	for (xj=0 ; xj<SIZE ; ++xj ) {
-		++constraints[i][xj];
-	}
-	// subsquare
-	for (xi=0 ; xi<SUBSIZE ; ++xi ) {
-		int ii = SUBSIZE * (i/SUBSIZE) + xi ;
-		for (xj=0 ; xj<SUBSIZE ; ++xj ) {
-			int jj = SUBSIZE * (j/SUBSIZE) + xj ;
-			++constraints[ii][jj];
-		}
-	}
-	// push this slot off the map!
-	constraints[i][j] += MAXCONSTRAINT;
+    // column
+    for (xi=0 ; xi<SIZE ; ++xi ) {
+        ++constraints[xi][j];
+    }
+    // row
+    for (xj=0 ; xj<SIZE ; ++xj ) {
+        ++constraints[i][xj];
+    }
+    // subsquare
+    for (xi=0 ; xi<SUBSIZE ; ++xi ) {
+        int ii = SUBSIZE * (i/SUBSIZE) + xi ;
+        for (xj=0 ; xj<SUBSIZE ; ++xj ) {
+            int jj = SUBSIZE * (j/SUBSIZE) + xj ;
+            ++constraints[ii][jj];
+        }
+    }
+    // push this slot off the map!
+    constraints[i][j] += MAXCONSTRAINT;
 }
 
 void find_next( int fill ) {
-	int low = MAXCONSTRAINT+1 ;
-	int i, j ;
-	int besti, bestj ;
-		
-	for( i=0 ; i<SIZE ; ++i ) {
-		for (j=0 ; j<SIZE ; ++j ) {
-			if ( constraints[i][j] < low ) {
-				besti = i;
-				bestj = j;
-				low = constraints[i][j] ;
-			}
-		}
-	}
-	
-	order[fill].i = besti ;
-	order[fill].j = bestj ;
-	AddConstraint(besti,bestj);
+    int low = MAXCONSTRAINT+1 ;
+    int i, j ;
+    int besti, bestj ;
+        
+    for( i=0 ; i<SIZE ; ++i ) {
+        for (j=0 ; j<SIZE ; ++j ) {
+            if ( constraints[i][j] < low ) {
+                besti = i;
+                bestj = j;
+                low = constraints[i][j] ;
+            }
+        }
+    }
+    
+    order[fill].i = besti ;
+    order[fill].j = bestj ;
+    AddConstraint(besti,bestj);
 }
 
 // 1 is bad, 0 is good
 int verify_order( void ) {
-	int fill ;
-	int check[SIZE][SIZE] ;
-	
-	Zero(check) ;
-	
-	for ( fill=0 ; fill<TOTALSIZE ; ++ fill ) {
-		int i = order[fill].i ;
-		int j = order[fill].j ;
-		if ( i < 0 || i >= SIZE ) {
-			fprintf(stderr,"Order slot %d (%d,%d) is a has a bad i value\n",fill,i,j) ;
-			return 1 ;
-		}
-		if ( j < 0 || j >= SIZE ) {
-			fprintf(stderr,"Order slot %d (%d,%d) is a has a bad j value\n",fill,i,j) ;
-			return 1 ;
-		}
-		if ( check[i][j] ) {
-			fprintf(stderr,"Order slot %d (%d,%d) has a repeat value first seen in slot %d\n",fill,i,j,check[i][j]-1) ;
-			return 1 ;
-		}
-		check[i][j] = fill+1 ;
-	}
-	return 0 ;
+    int fill ;
+    int check[SIZE][SIZE] ;
+    
+    Zero(check) ;
+    
+    for ( fill=0 ; fill<TOTALSIZE ; ++ fill ) {
+        int i = order[fill].i ;
+        int j = order[fill].j ;
+        if ( i < 0 || i >= SIZE ) {
+            fprintf(stderr,"Order slot %d (%d,%d) is a has a bad i value\n",fill,i,j) ;
+            return 1 ;
+        }
+        if ( j < 0 || j >= SIZE ) {
+            fprintf(stderr,"Order slot %d (%d,%d) is a has a bad j value\n",fill,i,j) ;
+            return 1 ;
+        }
+        if ( check[i][j] ) {
+            fprintf(stderr,"Order slot %d (%d,%d) has a repeat value first seen in slot %d\n",fill,i,j,check[i][j]-1) ;
+            return 1 ;
+        }
+        check[i][j] = fill+1 ;
+    }
+    return 0 ;
 }
 
 void print_order( void ) {
-	int fill ;
-	int i,j ;
-	int reorder[SIZE][SIZE] ;
-			
-	Zero( reorder ) ;
-	
-	for ( fill=0 ; fill<TOTALSIZE ; ++fill ) {
-		reorder[order[fill].i][order[fill].j] = fill ;
-	}
-	
-	// Initial blank
-	fprintf(stderr,"\n");
+    int fill ;
+    int i,j ;
+    int reorder[SIZE][SIZE] ;
+            
+    Zero( reorder ) ;
+    
+    for ( fill=0 ; fill<TOTALSIZE ; ++fill ) {
+        reorder[order[fill].i][order[fill].j] = fill ;
+    }
+    
+    // Initial blank
+    fprintf(stderr,"\n");
 
-	// top line
-	for ( j=0 ; j<SIZE ; ++j ) {
-		fprintf(stderr,"+-----");
-	}
-	// end of top line
-	fprintf(stderr,"+\n");
-	
-	for (i=0 ; i<SIZE ; ++i ) { // each row
-		for ( j=0 ; j<SIZE ; ++j ) {
-			int c = (j%SUBSIZE)?':':'|' ;
-			fprintf(stderr,"%c%4d ",c,reorder[i][j]);
-		}
-		// end of row
-		fprintf(stderr,"|\n");
-		
-		// Separator line
-		for ( j=0 ; j<SIZE ; ++j ) {
-			int c = ((i+1)%SUBSIZE)?' ':'-';
-			fprintf(stderr,"+%c-%c-%c",c,c,c);
-		}
-		// end of separator
-		fprintf(stderr,"+\n");
-	} 
+    // top line
+    for ( j=0 ; j<SIZE ; ++j ) {
+        fprintf(stderr,"+-----");
+    }
+    // end of top line
+    fprintf(stderr,"+\n");
+    
+    for (i=0 ; i<SIZE ; ++i ) { // each row
+        for ( j=0 ; j<SIZE ; ++j ) {
+            int c = (j%SUBSIZE)?':':'|' ;
+            fprintf(stderr,"%c%4d ",c,reorder[i][j]);
+        }
+        // end of row
+        fprintf(stderr,"|\n");
+        
+        // Separator line
+        for ( j=0 ; j<SIZE ; ++j ) {
+            int c = ((i+1)%SUBSIZE)?' ':'-';
+            fprintf(stderr,"+%c-%c-%c",c,c,c);
+        }
+        // end of separator
+        fprintf(stderr,"+\n");
+    } 
 
-	// Final blank
-	fprintf(stderr,"\n");
+    // Final blank
+    fprintf(stderr,"\n");
 }   
 
 void WS4_order( void ) {
-	int fill ;
+    int fill ;
 
-	Zero( constraints ) ;
-	
-	for ( fill=0 ; fill<TOTALSIZE ; ++fill ) {
-		find_next( fill ) ;
-	}
+    Zero( constraints ) ;
+    
+    for ( fill=0 ; fill<TOTALSIZE ; ++fill ) {
+        find_next( fill ) ;
+    }
 }
 
 void TypeLoop( int (*fill)(void) ) {
@@ -337,7 +337,7 @@ void TypeLoop( int (*fill)(void) ) {
     uint64_t count ;
 
     for (count=0;count<=max_tries;++count ) {
-		int f = fill() ;
+        int f = fill() ;
         switch( f ) {
             case -1:
                 ++good ;
@@ -349,7 +349,7 @@ void TypeLoop( int (*fill)(void) ) {
                 ++candidate ;
                 ++distribution[TOTALSIZE] ;
                 if ( candidate % 10000 == 0 ) {
-					TypeLoopPrint( count, candidate,good ) ;
+                    TypeLoopPrint( count, candidate,good ) ;
                 }
                 break ;
             default:
@@ -358,11 +358,11 @@ void TypeLoop( int (*fill)(void) ) {
                 break ;
         }
         if ( rupt ) {
-			break ;
-		}
+            break ;
+        }
     }
     TypeLoopSummary( count, candidate, good ) ;
-	TypeLoopPrint( count, candidate, good ) ;
+    TypeLoopPrint( count, candidate, good ) ;
 }
 
 int SS_fill_square( void ) {
@@ -383,19 +383,104 @@ int SS_fill_square( void ) {
     Zero( ss_bits ) ;
     
     for ( fill=0 ; fill<TOTALSIZE ; ++fill ) {
-		int i = order[fill].i ;
-		int j = order[fill].j ;
-		int si = i / SUBSIZE ;
-		int sj = j / SUBSIZE ;
-		int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
-		if (b == 0 ) {
-			return fill+1 ;
-		}
-		row_bits[i] |= b ;
-		col_bits[j] |= b ;
-		ss_bits[si][sj] |= b ;
-		bit[i][j] = b ;
-	}
+        int i = order[fill].i ;
+        int j = order[fill].j ;
+        int si = i / SUBSIZE ;
+        int sj = j / SUBSIZE ;
+        int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
+        if (b == 0 ) {
+            return fill+1 ;
+        }
+        row_bits[i] |= b ;
+        col_bits[j] |= b ;
+        ss_bits[si][sj] |= b ;
+        bit[i][j] = b ;
+    }
+    return TOTALSIZE ;
+}
+       
+int SS_fill_square_backup( void ) {
+    int fill ;
+    int col_bits[SIZE] ;
+    int row_bits[SIZE] ;
+    int ss_bits[SUBSIZE][SUBSIZE] ;
+    
+    int fill_copy = -1 ;
+    int col_bits_copy[SIZE] ;
+    int row_bits_copy[SIZE] ;
+    int ss_bits_copy[SUBSIZE][SUBSIZE] ;
+    
+    Zero(bit) ;
+    
+    // column bits culmulative
+    Zero( col_bits ) ;
+    
+    // row bits culmulative
+    Zero( row_bits ) ;
+    
+    // subsquare bits culmulative
+    Zero( ss_bits ) ;
+    
+    for ( fill=0 ; fill<TOTALSIZE ; ++fill ) {
+        int i = order[fill].i ;
+        int j = order[fill].j ;
+        int si = i / SUBSIZE ;
+        int sj = j / SUBSIZE ;
+        int m = col_bits[j]|row_bits[i]|ss_bits[si][sj] ;
+        int b = find_valid_bit( m ) ;
+        if (b == 0 ) {
+            //check if alternative exists
+            if ( fill_copy >=0 ) {
+                goto second_chance ; // yeah, really
+            }
+            return fill+1 ;
+        }
+
+        // See if a backup spot
+        if ( (fill > SIZE) && (b|m != full_pattern) ) {
+            fill_copy = fill ;
+            memcpy( col_bits_copy, col_bits , sizeof(col_bits_copy) ) ;
+            memcpy( row_bits_copy, row_bits , sizeof(row_bits_copy) ) ;
+            memcpy( ss_bits_copy, ss_bits , sizeof(ss_bits_copy) ) ;
+        }
+        
+        row_bits[i] |= b ;
+        col_bits[j] |= b ;
+        ss_bits[si][sj] |= b ;
+        bit[i][j] = b ;
+    }
+    return TOTALSIZE ;
+    
+    second_chance:
+    {
+        // branch point -- known to have more than one valid choice
+        int i = order[fill_copy].i ;
+        int j = order[fill_copy].j ;
+        int si = i / SUBSIZE ;
+        int sj = j / SUBSIZE ;
+        // include previous choice in mask
+        int b = find_valid_bit( col_bits_copy[j]|row_bits_copy[i]|ss_bits_copy[si][sj]|bit[i][j] ) ;
+        row_bits_copy[i] |= b ;
+        col_bits_copy[j] |= b ;
+        ss_bits_copy[si][sj] |= b ;
+        bit[i][j] = b ;
+    }
+    for ( fill=fill_copy+1 ; fill<TOTALSIZE ; ++fill ) {
+        int i = order[fill].i ;
+        int j = order[fill].j ;
+        int si = i / SUBSIZE ;
+        int sj = j / SUBSIZE ;
+        int m = col_bits_copy[j]|row_bits_copy[i]|ss_bits_copy[si][sj] ;
+        int b = find_valid_bit( m ) ;
+        if (b == 0 ) {
+            return fill+1 ;
+        }
+
+        row_bits_copy[i] |= b ;
+        col_bits_copy[j] |= b ;
+        ss_bits_copy[si][sj] |= b ;
+        bit[i][j] = b ;
+    }
     return TOTALSIZE ;
 }
 
@@ -412,10 +497,10 @@ void SS1_order( void ) {
                     ++ filled ;
                     order[filled].i = i ;
                     order[filled].j = j ;
-				}
-			}
-		}
-	}
+                }
+            }
+        }
+    }
 }
 
 void SS2_order( void ) {
@@ -429,16 +514,16 @@ void SS2_order( void ) {
                 for (ssi=sk;ssi<SUBSIZE;++ssi) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*k+sk ;
-					++fill ;
-					order[fill].i = i ;
-					order[fill].j = j ;
+                    ++fill ;
+                    order[fill].i = i ;
+                    order[fill].j = j ;
                 }
                 for ( ssj=sk+1;ssj<SUBSIZE;++ssj) {
                     int i = SUBSIZE*si+sk ;
                     int j = SUBSIZE*k+ssj ;
-					++fill ;
-					order[fill].i = i ;
-					order[fill].j = j ;
+                    ++fill ;
+                    order[fill].i = i ;
+                    order[fill].j = j ;
                 }
             }
         }
@@ -447,16 +532,16 @@ void SS2_order( void ) {
                 for (ssi=sk;ssi<SUBSIZE;++ssi) {
                     int i = SUBSIZE*k+ssi ;
                     int j = SUBSIZE*sj+sk ;
-					++fill ;
-					order[fill].i = i ;
-					order[fill].j = j ;
+                    ++fill ;
+                    order[fill].i = i ;
+                    order[fill].j = j ;
                 }
                 for ( ssj=sk+1;ssj<SUBSIZE;++ssj) {
                     int i = SUBSIZE*k+sk ;
                     int j = SUBSIZE*sj+ssj ;
-					++fill ;
-					order[fill].i = i ;
-					order[fill].j = j ;
+                    ++fill ;
+                    order[fill].i = i ;
+                    order[fill].j = j ;
                 }
             }
         }
@@ -469,52 +554,52 @@ void SS3_order( void ) {
     // Fill columns and rows
     // Top triangle
     for (sk=0;sk<SUBSIZE;++sk) {
-		for (si=0;si<=sk;++si) {
-			sj = sk-si ;
-			// Top triangle
-			for(ssk=0;ssk<SUBSIZE;++ssk) {
-				for (ssi=0;ssi<=ssk;++ssi) {
+        for (si=0;si<=sk;++si) {
+            sj = sk-si ;
+            // Top triangle
+            for(ssk=0;ssk<SUBSIZE;++ssk) {
+                for (ssi=0;ssi<=ssk;++ssi) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*sj+ssk-ssi ;
-					++fill ;
-					order[fill].i = i ;
-					order[fill].j = j ;
+                    ++fill ;
+                    order[fill].i = i ;
+                    order[fill].j = j ;
                 }
             }
             // bottom triangle
-			for(ssk=1;ssk<SUBSIZE;++ssk) {
-				for (ssi=ssk;ssi<SUBSIZE;++ssi) {
+            for(ssk=1;ssk<SUBSIZE;++ssk) {
+                for (ssi=ssk;ssi<SUBSIZE;++ssi) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*sj+SUBSIZE-1+ssk-ssi ;
-					++fill ;
-					order[fill].i = i ;
-					order[fill].j = j ;
+                    ++fill ;
+                    order[fill].i = i ;
+                    order[fill].j = j ;
                 }
             }
         }
     }
     // bottom triangle
     for (sk=1;sk<SUBSIZE;++sk) {
-		for (si=sk;si<SUBSIZE;++si) {
-			sj = SUBSIZE-1+sk-si ;
-			// Top triangle
-			for(ssk=0;ssk<SUBSIZE;++ssk) {
-				for (ssi=0;ssi<=ssk;++ssi) {
+        for (si=sk;si<SUBSIZE;++si) {
+            sj = SUBSIZE-1+sk-si ;
+            // Top triangle
+            for(ssk=0;ssk<SUBSIZE;++ssk) {
+                for (ssi=0;ssi<=ssk;++ssi) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*sj+ssk-ssi ;
-					++fill ;
-					order[fill].i = i ;
-					order[fill].j = j ;
+                    ++fill ;
+                    order[fill].i = i ;
+                    order[fill].j = j ;
                 }
             }
             // bottom triangle
-			for(ssk=1;ssk<SUBSIZE;++ssk) {
-				for (ssi=ssk;ssi<SUBSIZE;++ssi) {
+            for(ssk=1;ssk<SUBSIZE;++ssk) {
+                for (ssi=ssk;ssi<SUBSIZE;++ssi) {
                     int i = SUBSIZE*si+ssi ;
                     int j = SUBSIZE*sj+SUBSIZE-1+ssk-ssi ;
-					++fill ;
-					order[fill].i = i ;
-					order[fill].j = j ;
+                    ++fill ;
+                    order[fill].i = i ;
+                    order[fill].j = j ;
                 }
             }
         }
@@ -527,9 +612,9 @@ void WS1_order( void ) {
     // Fill columns and rows
     for (i=0;i<SIZE;++i) {
         for (j=0;j<SIZE;++j) {
-			++fill ;
-			order[fill].i = i ;
-			order[fill].j = j ;
+            ++fill ;
+            order[fill].i = i ;
+            order[fill].j = j ;
         }
     }
 }
@@ -541,19 +626,19 @@ void WS2_order( void ) {
     // Fill columns and rows
     for (k=0;k<SIZE;++k) {
         for (i=k;i<SIZE;++i) {
-			int si = i / SUBSIZE ;
-			int sj = k / SUBSIZE ;
-			++fill ;
-			order[fill].i = i ;
-			order[fill].j = k ;
+            int si = i / SUBSIZE ;
+            int sj = k / SUBSIZE ;
+            ++fill ;
+            order[fill].i = i ;
+            order[fill].j = k ;
         }
         for (j=k+1;j<SIZE;++j) {
-			int si = k / SUBSIZE ;
-			int sj = j / SUBSIZE ;
-			++fill ;
-			order[fill].i = k ;
-			order[fill].j = j ;
-		}
+            int si = k / SUBSIZE ;
+            int sj = j / SUBSIZE ;
+            ++fill ;
+            order[fill].i = k ;
+            order[fill].j = j ;
+        }
     }
 }
 
@@ -563,21 +648,21 @@ void WS3_order( void ) {
     // Fill columns and rows
     // Top triangle
     for (k=0;k<SIZE;++k) {
-		for (i=0;i<=k;++i) {
-			int j = k-i ;
-			++fill ;
-			order[fill].i = i ;
-			order[fill].j = j ;
-		}
-	}
+        for (i=0;i<=k;++i) {
+            int j = k-i ;
+            ++fill ;
+            order[fill].i = i ;
+            order[fill].j = j ;
+        }
+    }
     // bottom triangle
     for (k=1;k<SIZE;++k) {
-		for (i=k;i<SIZE;++i) {
-			int j = SIZE-1+k-i ;
-			++fill ;
-			order[fill].i = i ;
-			order[fill].j = j ;
-		}
+        for (i=k;i<SIZE;++i) {
+            int j = SIZE-1+k-i ;
+            ++fill ;
+            order[fill].i = i ;
+            order[fill].j = j ;
+        }
     }
 }
 
@@ -602,59 +687,59 @@ int X_fill_square( void ) {
     
     // Fill columns and rows
     for ( fill=0 ; fill < TOTALSIZE ; ++fill ) {
-		int i = order[fill].i ;
-		int j = order[fill].j ;
-		int si = i / SUBSIZE ;
-		int sj = j / SUBSIZE ;
-		int m = col_bits[j]|row_bits[i]|ss_bits[si][sj] ;
-		int b ;
-		if ( i != j ) { // not main diagonal
-			if ( SIZE-i != j ) { // not any diagonal
-				b = find_valid_bit( m ) ;
-				if (b == 0 ) {
-					return fill+1 ;
-				}
-			} else { // second diagonal
-				b = find_valid_bit( m|diag2 ) ;
-				if (b == 0 ) {
-					return fill+1 ;
-				}
-				diag2|=b ;
-			}
-		} else {
-			if ( SIZE-i != j ) { // first diagonal
-				b = find_valid_bit( m|diag1 ) ;
-				if (b == 0 ) {
-					return fill+1 ;
-				}
-				diag1 |= b ;
-			} else { // Both diagonals (center)
-				b = find_valid_bit( m|diag2|diag1 ) ;
-				if (b == 0 ) {
-					return fill+1 ;
-				}
-				diag2|=b ;
-				diag1|=b ;
-			}
-		}
-		row_bits[i] |= b ;
-		col_bits[j] |= b ;
-		ss_bits[si][sj] |= b ;
-		bit[i][j] = b ;
+        int i = order[fill].i ;
+        int j = order[fill].j ;
+        int si = i / SUBSIZE ;
+        int sj = j / SUBSIZE ;
+        int m = col_bits[j]|row_bits[i]|ss_bits[si][sj] ;
+        int b ;
+        if ( i != j ) { // not main diagonal
+            if ( SIZE-i != j ) { // not any diagonal
+                b = find_valid_bit( m ) ;
+                if (b == 0 ) {
+                    return fill+1 ;
+                }
+            } else { // second diagonal
+                b = find_valid_bit( m|diag2 ) ;
+                if (b == 0 ) {
+                    return fill+1 ;
+                }
+                diag2|=b ;
+            }
+        } else {
+            if ( SIZE-i != j ) { // first diagonal
+                b = find_valid_bit( m|diag1 ) ;
+                if (b == 0 ) {
+                    return fill+1 ;
+                }
+                diag1 |= b ;
+            } else { // Both diagonals (center)
+                b = find_valid_bit( m|diag2|diag1 ) ;
+                if (b == 0 ) {
+                    return fill+1 ;
+                }
+                diag2|=b ;
+                diag1|=b ;
+            }
+        }
+        row_bits[i] |= b ;
+        col_bits[j] |= b ;
+        ss_bits[si][sj] |= b ;
+        bit[i][j] = b ;
     }
     return TOTALSIZE ;
 }
 
 void SSLoopPrint( uint64_t count, uint64_t good, uint64_t totalcount ) {
-	if ( !quiet ) {
-		printf("count=%"PRIu64", Good=%"PRIu64"\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
-}	}
+    if ( !quiet ) {
+        printf("count=%"PRIu64", Good=%"PRIu64"\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+}   }
 
 void SSLoopSummary( uint64_t count, uint64_t good, uint64_t totalcount ) {
-	if ( fsummary ) {
-		fprintf(fsummary,"Type,Count,Good,Average,perSec,Success%%n") ;
-		fprintf(fsummary,"%s,%"PRIu64",%"PRIu64",%g.1,%.1f,%.6f%%\n",key,count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
-}	}
+    if ( fsummary ) {
+        fprintf(fsummary,"Type,Count,Good,Average,perSec,Success%%n") ;
+        fprintf(fsummary,"%s%s,%"PRIu64",%"PRIu64",%g.1,%.1f,%.6f%%\n",key,back,count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+}   }
 
 void SSLoop( int (*fill)(void) ) {
     uint64_t count ;
@@ -673,16 +758,16 @@ void SSLoop( int (*fill)(void) ) {
             SSLoopPrint( count, good, totalcount ) ;
         }
         if ( rupt ) {
-			break ;
-		}
+            break ;
+        }
     }
     SSLoopSummary(count,good,totalcount);
     SSLoopPrint( count, good, totalcount ) ;
 }
 
 void RuptHandler( int sig ) {
-	signal( sig, SIG_IGN ) ;
-	rupt = 1 ;
+    signal( sig, SIG_IGN ) ;
+    rupt = 1 ;
 }
 
 void help(char * prog) {
@@ -704,6 +789,7 @@ void help(char * prog) {
     "\t\t 2 -- alternating column/row\n"
     "\t\t 3 -- diagonal\n"
     "\t\t 4 -- scattered -- least constrained\n"
+    "\t-b -- backup one level on dead end (only for s and w)\n"
     "\t -f filename\tPlace solutions in 'filename' (81 comma-separated values per line\n"
     "\t -d filename\tDistribution of tries (number of square aborted) every 1^6 tries\n"
     "\t -g filename\tPlace summary data in filename\n"
@@ -719,6 +805,7 @@ void help(char * prog) {
 int main(int argc, char ** argv) {
     int c ; 
     int ordering = 0 ;
+    int backup = 0 ;
     
     void (*loop)( int (*fill)(void) ) = TypeLoop ; //default
     int (*fill)(void) = Type_fill_square ; //default
@@ -727,13 +814,13 @@ int main(int argc, char ** argv) {
     SEED ;
     make_pattern();
         
-	Zero(distribution) ;
-	
-	signal( SIGINT, RuptHandler ) ;
-	
-	WS1_order() ; //default
-	
-    while ( (c = getopt( argc, argv, "hoqx:t:w:s:f:d:g:" )) != -1 ) {
+    Zero(distribution) ;
+    
+    signal( SIGINT, RuptHandler ) ;
+    
+    WS1_order() ; //default
+    
+    while ( (c = getopt( argc, argv, "hoqx:t:w:s:f:d:g:b" )) != -1 ) {
         switch(c) 
         {
             case 't':
@@ -741,22 +828,22 @@ int main(int argc, char ** argv) {
                 fill = Type_fill_square ;
                 switch (optarg[0]) {
                     case '4':
-						key = "t4" ;
+                        key = "t4" ;
                         type = "Subsquare later -- least constraints" ;
                         WS4_order() ;
                         break ;
                     case '3':
-						key = "t3" ;
+                        key = "t3" ;
                         type = "Subsquare later -- diagonals" ;
                         WS3_order() ;
                         break ;
                     case '2':
-						key = "t2" ;
+                        key = "t2" ;
                         type = "Subsquare later -- alternating" ;
                         WS2_order() ;
                         break ;
                     default:
-						key = "t1" ;
+                        key = "t1" ;
                         type = "Subsquare later -- columns" ;
                         WS1_order() ;
                         break ;
@@ -767,18 +854,18 @@ int main(int argc, char ** argv) {
                 fill = SS_fill_square ;
                 switch (optarg[0]) {
                     case '3':
-						key = "s3" ;
-						type = "Diagonal Subsquare" ;
-						SS3_order() ;
+                        key = "s3" ;
+                        type = "Diagonal Subsquare" ;
+                        SS3_order() ;
                         break ;
                     case '2':
-						key = "s2" ;
-						type = "Alternating Subsquare" ;
+                        key = "s2" ;
+                        type = "Alternating Subsquare" ;
                         SS2_order() ;
                         break ;
                     default:
-						key = "s1" ;
-						type = "Columns Subsquare" ;
+                        key = "s1" ;
+                        type = "Columns Subsquare" ;
                         SS1_order() ;
                         break ;
                 }
@@ -788,53 +875,57 @@ int main(int argc, char ** argv) {
                 fill = SS_fill_square ;
                 switch (optarg[0]) {
                     case '4':
-						key = "w4" ;
-						type = "Least constrained Whole square" ;
+                        key = "w4" ;
+                        type = "Least constrained Whole square" ;
                         WS4_order() ;
                         break ;
                     case '3':
-						key = "w3" ;
-						type = "Diagonal Whole square" ;
+                        key = "w3" ;
+                        type = "Diagonal Whole square" ;
                         WS3_order() ;
                         break ;
                     case '2':
-						key = "w2" ;
-						type = "Alternating Whole square" ;
+                        key = "w2" ;
+                        type = "Alternating Whole square" ;
                         WS2_order() ;
                         break ;
                     default:
-						key = "w1" ;
-						type = "Columns Whole square" ;
+                        key = "w1" ;
+                        type = "Columns Whole square" ;
                         WS1_order() ;
                         break ;
                 }
                 break ;
             case 'x':
                 loop = SSLoop ;
-				type = "x Columns X-square" ;
+                type = "x Columns X-square" ;
                 fill = X_fill_square ;
                 switch (optarg[0]) {
                     case '4':
-						key = "x4" ;
-						type = "Least constrained with X" ;
+                        key = "x4" ;
+                        type = "Least constrained with X" ;
                         WS4_order() ;
                         break ;
                     case '3':
-						key = "x3" ;
-						type = "Diagonal with X" ;
+                        key = "x3" ;
+                        type = "Diagonal with X" ;
                         WS3_order() ;
                         break ;
                     case '2':
-						key = "x2" ;
-						type = "Alternating with X" ;
+                        key = "x2" ;
+                        type = "Alternating with X" ;
                         WS2_order() ;
                         break ;
                     default:
-						key = "x1" ;
-						type = "Columns wint X" ;
+                        key = "x1" ;
+                        type = "Columns wint X" ;
                         WS1_order() ;
                         break ;
                 }
+                break ;
+            case 'b':
+                backup = 1 ;
+                back = "B";
                 break ;
             case 'f':
                 // solution file
@@ -863,12 +954,12 @@ int main(int argc, char ** argv) {
                     exit(1);
                 }
                 break ;
-			case 'o':
-				ordering = 1 ;
-				break ;
-			case 'q':
-				quiet = 1 ;
-				break ;
+            case 'o':
+                ordering = 1 ;
+                break ;
+            case 'q':
+                quiet = 1 ;
+                break ;
             case 'h':
             default:
                 help(argv[0]) ;
@@ -879,25 +970,35 @@ int main(int argc, char ** argv) {
     // optind is for the extra arguments 
     // which are not parsed 
     if (optind < argc) {
-		uint64_t m = strtoull(argv[optind],NULL,0) ;
-		if ( m > 0 && m < max_tries ) {
-			max_tries = m ;
-		}
+        uint64_t m = strtoull(argv[optind],NULL,0) ;
+        if ( m > 0 && m < max_tries ) {
+            max_tries = m ;
+        }
     } 
     
     if ( verify_order() ) {
-		fprintf(stderr,"Order verifying for %s - %s fails -- abort\n",key,type) ;
-		exit(1) ;
-	}
+        fprintf(stderr,"Order verifying for %s%s - %s fails -- abort\n",key,back,type) ;
+        exit(1) ;
+    }
     
+    if ( backup ) {
+        if ( fill == SS_fill_square ) {
+            fill = SS_fill_square_backup ;
+        } else {
+            fprintf(stderr,"Backup (-b) option not implemented for %s - %s\n",key,type);
+            fprintf(stderr,"Ignoring Backup\n",key,type);
+            back = " " ;
+        }
+    }
+                
     if ( ordering ) {
-		printf( "%s - %s\n", key,type ) ;
-		print_order() ;
-	}
+        printf( "%s%s - %s\n", key,back,type ) ;
+        print_order() ;
+    }
     
     start = clock() ;
     
     loop(fill) ;
-	Distribution() ;
+    Distribution() ;
     return 0 ;
 }
