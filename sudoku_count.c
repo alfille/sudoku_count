@@ -33,7 +33,6 @@ struct SearchOrder {
 struct SearchOrder order[ TOTALSIZE ] ; 
 
 char * key = "?" ;
-char * back = " " ;
 
 #define Zero(array) memset( array, 0, sizeof(array) ) ;
 
@@ -90,6 +89,69 @@ int find_valid_bit( int mask ) {
     return trial ;
 }
 
+
+// For backtracking state
+#define MAXTRACK 10
+struct FillState {
+    int row_bits[SIZE] ;
+    int col_bits[SIZE] ;
+    int ss_bits[SIZE][SIZE] ;
+    int fill ;
+} State[MAXTRACK] ;
+
+struct StateStack {
+    int size ;
+    int start ;
+    int end ;
+    char * back ;
+} statestack = { 0,0,0,NULL };
+
+void StateStackCreate( int size ) {
+    if ( size < 0 ) {
+        fprintf(stderr,"Backtracking depth %d corrected to %d\n",size,0);
+        size = 0 ;
+    } else if ( size > MAXTRACK ) {
+        fprintf(stderr,"Backtracking depth %d corrected to %d\n",size,MAXTRACK);
+        size = MAXTRACK ;
+    }
+    statestack.size = size ;
+    if ( statestack.back == NULL ) {
+        statestack.back = malloc( 11 ) ;
+    }
+    snprintf( statestack.back, 10, "B%d" , size ) ;    
+}
+
+struct FillState * StateStackInit ( void ) {
+    statestack.start = statestack.end = 0 ;
+    memset( & State[0], 0, sizeof( struct FillState ) ) ;
+    return & State[0] ;
+}
+
+struct FillState * StateStackPush( void ) {
+    if ( statestack.size == 0 ) {
+        return & State[0] ;
+    } else {
+        int oldend = statestack.end ;
+        statestack.end = (statestack.end+1) % statestack.size ;
+        if ( statestack.end == statestack.start ) {
+            // overfilled -- move the start
+            statestack.start = (statestack.start+1) % statestack.size ;
+        }
+        memcpy( & State[statestack.end], & State[oldend], sizeof( struct FillState ) ) ;
+        return & State[statestack.end] ;
+    }
+}
+
+struct FillState * StateStackPop( void ) {
+    if ( statestack.start == statestack.end ) {
+        // empty
+        return NULL ;
+    } else {
+        statestack.end = ( statestack.end + statestack.size - 1 ) % statestack.size ; // make sure positive modulo
+        return & State[statestack.end] ;
+    }
+}
+
 void print_square( void ) {
     if ( !quiet ) {
         int i ;
@@ -141,7 +203,7 @@ void print_square( void ) {
 void Distribution( void ) {
     if ( fdistribution ) {
         int d ;
-        fprintf(fdistribution,"%s%s",key,back) ;
+        fprintf(fdistribution,"%s%s",key,statestack.back) ;
         for ( d=0;d<=TOTALSIZE;++d) {
             fprintf(fdistribution,",%"PRIu64,distribution[d]) ; 
         }
@@ -203,7 +265,7 @@ void TypeLoopPrint( uint64_t count, uint64_t candidate, uint64_t good ) {
 void TypeLoopSummary( uint64_t count, uint64_t candidate, uint64_t good ) {
     if ( fsummary ) {
         fprintf(fsummary,"Type,Bad,Candidate,Good,perSec,Cand%%,Good%%\n") ;
-        fprintf(fsummary,"%s%s,%"PRIu64",%"PRIu64",%"PRIu64",%g.2,%.6f%%,%.6f%%\n",key,back,count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
+        fprintf(fsummary,"%s%s,%"PRIu64",%"PRIu64",%"PRIu64",%g.2,%.6f%%,%.6f%%\n",key,statestack.back,count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
 }   }
 
 int constraints[SIZE][SIZE] ;
@@ -366,120 +428,41 @@ void TypeLoop( int (*fill)(void) ) {
 }
 
 int SS_fill_square( void ) {
-    int fill ;
-    int col_bits[SIZE] ;
-    int row_bits[SIZE] ;
-    int ss_bits[SUBSIZE][SUBSIZE] ;
+    
+    struct FillState * pFS = StateStackInit() ;
     
     Zero(bit) ;
     
-    // column bits culmulative
-    Zero( col_bits ) ;
-    
-    // row bits culmulative
-    Zero( row_bits ) ;
-    
-    // subsquare bits culmulative
-    Zero( ss_bits ) ;
-    
-    for ( fill=0 ; fill<TOTALSIZE ; ++fill ) {
-        int i = order[fill].i ;
-        int j = order[fill].j ;
+    for ( pFS->fill=0 ; pFS->fill<TOTALSIZE ; ) {
+        int i = order[pFS->fill].i ;
+        int j = order[pFS->fill].j ;
         int si = i / SUBSIZE ;
         int sj = j / SUBSIZE ;
-        int b = find_valid_bit( col_bits[j]|row_bits[i]|ss_bits[si][sj] ) ;
-        if (b == 0 ) {
-            return fill+1 ;
-        }
-        row_bits[i] |= b ;
-        col_bits[j] |= b ;
-        ss_bits[si][sj] |= b ;
-        bit[i][j] = b ;
-    }
-    return TOTALSIZE ;
-}
-       
-int SS_fill_square_backup( void ) {
-    int fill ;
-    int col_bits[SIZE] ;
-    int row_bits[SIZE] ;
-    int ss_bits[SUBSIZE][SUBSIZE] ;
-    
-    int fill_copy = -1 ;
-    int col_bits_copy[SIZE] ;
-    int row_bits_copy[SIZE] ;
-    int ss_bits_copy[SUBSIZE][SUBSIZE] ;
-    
-    Zero(bit) ;
-    
-    // column bits culmulative
-    Zero( col_bits ) ;
-    
-    // row bits culmulative
-    Zero( row_bits ) ;
-    
-    // subsquare bits culmulative
-    Zero( ss_bits ) ;
-    
-    for ( fill=0 ; fill<TOTALSIZE ; ++fill ) {
-        int i = order[fill].i ;
-        int j = order[fill].j ;
-        int si = i / SUBSIZE ;
-        int sj = j / SUBSIZE ;
-        int m = col_bits[j]|row_bits[i]|ss_bits[si][sj] ;
+        int m = pFS->col_bits[j]|pFS->row_bits[i]|pFS->ss_bits[si][sj] ;
         int b = find_valid_bit( m ) ;
         if (b == 0 ) {
+            int fill = pFS->fill ;
             //check if alternative exists
-            if ( fill_copy >=0 ) {
-                goto second_chance ; // yeah, really
+            if ( (pFS = StateStackPop()) ) {
+                // try with old position and data (but the prior choice is added to the exclusions)
+                continue ;
             }
             return fill+1 ;
         }
 
+        pFS->row_bits[i] |= b ;
+        pFS->col_bits[j] |= b ;
+        pFS->ss_bits[si][sj] |= b ;
+
+        bit[i][j] = b ;
+
         // See if a backup spot
-        if ( (fill > SIZE) && ((b|m) != full_pattern) ) {
-            fill_copy = fill ;
-            memcpy( col_bits_copy, col_bits , sizeof(col_bits_copy) ) ;
-            memcpy( row_bits_copy, row_bits , sizeof(row_bits_copy) ) ;
-            memcpy( ss_bits_copy, ss_bits , sizeof(ss_bits_copy) ) ;
+        if ( (pFS->fill > SIZE) && ((b|m) != full_pattern) ) {
+            // has current restriction built in.
+            pFS = StateStackPush() ;
         }
         
-        row_bits[i] |= b ;
-        col_bits[j] |= b ;
-        ss_bits[si][sj] |= b ;
-        bit[i][j] = b ;
-    }
-    return TOTALSIZE ;
-    
-    second_chance:
-    {
-        // branch point -- known to have more than one valid choice
-        int i = order[fill_copy].i ;
-        int j = order[fill_copy].j ;
-        int si = i / SUBSIZE ;
-        int sj = j / SUBSIZE ;
-        // include previous choice in mask
-        int b = find_valid_bit( col_bits_copy[j]|row_bits_copy[i]|ss_bits_copy[si][sj]|bit[i][j] ) ;
-        row_bits_copy[i] |= b ;
-        col_bits_copy[j] |= b ;
-        ss_bits_copy[si][sj] |= b ;
-        bit[i][j] = b ;
-    }
-    for ( fill=fill_copy+1 ; fill<TOTALSIZE ; ++fill ) {
-        int i = order[fill].i ;
-        int j = order[fill].j ;
-        int si = i / SUBSIZE ;
-        int sj = j / SUBSIZE ;
-        int m = col_bits_copy[j]|row_bits_copy[i]|ss_bits_copy[si][sj] ;
-        int b = find_valid_bit( m ) ;
-        if (b == 0 ) {
-            return fill+1 ;
-        }
-
-        row_bits_copy[i] |= b ;
-        col_bits_copy[j] |= b ;
-        ss_bits_copy[si][sj] |= b ;
-        bit[i][j] = b ;
+        ++pFS->fill ;
     }
     return TOTALSIZE ;
 }
@@ -738,7 +721,7 @@ void SSLoopPrint( uint64_t count, uint64_t good, uint64_t totalcount ) {
 void SSLoopSummary( uint64_t count, uint64_t good, uint64_t totalcount ) {
     if ( fsummary ) {
         fprintf(fsummary,"Type,Count,Good,Average,perSec,Success%%n") ;
-        fprintf(fsummary,"%s%s,%"PRIu64",%"PRIu64",%g.1,%.1f,%.6f%%\n",key,back,count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+        fprintf(fsummary,"%s%s,%"PRIu64",%"PRIu64",%g.1,%.1f,%.6f%%\n",key,statestack.back,count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
 }   }
 
 void SSLoop( int (*fill)(void) ) {
@@ -789,7 +772,7 @@ void help(char * prog) {
     "\t\t 2 -- alternating column/row\n"
     "\t\t 3 -- diagonal\n"
     "\t\t 4 -- scattered -- least constrained\n"
-    "\t-b -- backup one level on dead end (only for s and w)\n"
+    "\t-b n -- backtrack 'n' levels on dead end (only for s and w) -- default 0\n"
     "\t -f filename\tPlace solutions in 'filename' (81 comma-separated values per line\n"
     "\t -d filename\tDistribution of tries (number of square aborted) every 1^6 tries\n"
     "\t -g filename\tPlace summary data in filename\n"
@@ -805,7 +788,6 @@ void help(char * prog) {
 int main(int argc, char ** argv) {
     int c ; 
     int ordering = 0 ;
-    int backup = 0 ;
     
     void (*loop)( int (*fill)(void) ) = TypeLoop ; //default
     int (*fill)(void) = Type_fill_square ; //default
@@ -820,7 +802,7 @@ int main(int argc, char ** argv) {
     
     WS1_order() ; //default
     
-    while ( (c = getopt( argc, argv, "hoqx:t:w:s:f:d:g:b" )) != -1 ) {
+    while ( (c = getopt( argc, argv, "hoqx:t:w:s:f:d:g:b:" )) != -1 ) {
         switch(c) 
         {
             case 't':
@@ -924,8 +906,7 @@ int main(int argc, char ** argv) {
                 }
                 break ;
             case 'b':
-                backup = 1 ;
-                back = "B";
+                StateStackCreate( atol( optarg ) ) ;
                 break ;
             case 'f':
                 // solution file
@@ -977,22 +958,18 @@ int main(int argc, char ** argv) {
     } 
     
     if ( verify_order() ) {
-        fprintf(stderr,"Order verifying for %s%s - %s fails -- abort\n",key,back,type) ;
+        fprintf(stderr,"Order verifying for %s%s - %s fails -- abort\n",key,statestack.back,type) ;
         exit(1) ;
     }
     
-    if ( backup ) {
-        if ( fill == SS_fill_square ) {
-            fill = SS_fill_square_backup ;
-        } else {
-            fprintf(stderr,"Backup (-b) option not implemented for %s - %s\n",key,type);
-            fprintf(stderr,"Ignoring Backup\n",key,type);
-            back = " " ;
-        }
+    if ( statestack.size > 0 && fill != SS_fill_square ) {
+        fprintf(stderr,"Backup (-b) option not implemented for %s - %s\n",key,type);
+        fprintf(stderr,"Ignoring Backup\n");
+        StateStackCreate( 0 ) ;
     }
                 
     if ( ordering ) {
-        printf( "%s%s - %s\n", key,back,type ) ;
+        printf( "%s%s - %s\n", key,statestack.back,type ) ;
         print_order() ;
     }
     
