@@ -91,7 +91,7 @@ int find_valid_bit( int mask ) {
 
 
 // For backtracking state
-#define MAXTRACK 10
+#define MAXTRACK 80
 struct FillState {
     int row_bits[SIZE] ;
     int col_bits[SIZE] ;
@@ -720,7 +720,7 @@ void SSLoopPrint( uint64_t count, uint64_t good, uint64_t totalcount ) {
 
 void SSLoopSummary( uint64_t count, uint64_t good, uint64_t totalcount ) {
     if ( fsummary ) {
-        fprintf(fsummary,"Type,Count,Good,Average,perSec,Success%%n") ;
+        fprintf(fsummary,"Type,Count,Good,Average,perSec,Success%%\n") ;
         fprintf(fsummary,"%s%s,%"PRIu64",%"PRIu64",%g.1,%.1f,%.6f%%\n",key,statestack.back,count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
 }   }
 
