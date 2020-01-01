@@ -97,6 +97,7 @@ struct FillState {
     int col_bits[SIZE] ;
     int ss_bits[SIZE][SIZE] ;
     int fill ;
+    int mask ;
 } State[MAXTRACK] ;
 
 struct StateStack {
@@ -110,11 +111,11 @@ void StateStackCreate( int size ) {
     if ( size < 0 ) {
         fprintf(stderr,"Backtracking depth %d corrected to %d\n",size,0);
         size = 0 ;
-    } else if ( size > MAXTRACK ) {
-        fprintf(stderr,"Backtracking depth %d corrected to %d\n",size,MAXTRACK);
-        size = MAXTRACK ;
+    } else if ( size > MAXTRACK-1 ) {
+        fprintf(stderr,"Backtracking depth %d corrected to %d\n",size,MAXTRACK-1);
+        size = MAXTRACK-1 ;
     }
-    statestack.size = size ;
+    statestack.size = size+1 ;
     if ( statestack.back == NULL ) {
         statestack.back = malloc( 11 ) ;
     }
@@ -438,7 +439,7 @@ int SS_fill_square( void ) {
         int j = order[pFS->fill].j ;
         int si = i / SUBSIZE ;
         int sj = j / SUBSIZE ;
-        int m = pFS->col_bits[j]|pFS->row_bits[i]|pFS->ss_bits[si][sj] ;
+        int m = pFS->col_bits[j]|pFS->row_bits[i]|pFS->ss_bits[si][sj]|pFS->mask ;
         int b = find_valid_bit( m ) ;
         if (b == 0 ) {
             int fill = pFS->fill ;
@@ -450,18 +451,19 @@ int SS_fill_square( void ) {
             return fill+1 ;
         }
 
+        // See if a backup spot
+        if ( (pFS->fill > SIZE) && ((b|m) != full_pattern) ) {
+            pFS->mask |= b ;
+            pFS = StateStackPush() ;
+        }
+        
         pFS->row_bits[i] |= b ;
         pFS->col_bits[j] |= b ;
         pFS->ss_bits[si][sj] |= b ;
 
         bit[i][j] = b ;
 
-        // See if a backup spot
-        if ( (pFS->fill > SIZE) && ((b|m) != full_pattern) ) {
-            // has current restriction built in.
-            pFS = StateStackPush() ;
-        }
-        
+        pFS->mask = 0 ;
         ++pFS->fill ;
     }
     return TOTALSIZE ;
