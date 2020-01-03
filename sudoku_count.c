@@ -95,7 +95,10 @@ int find_valid_bit( int mask ) {
 struct FillState {
     int row_bits[SIZE] ;
     int col_bits[SIZE] ;
-    int ss_bits[SIZE][SIZE] ;
+    int ss_bits[SUBSIZE][SUBSIZE] ;
+    int Xup ;
+    int Xdown ;
+    int Window[SUBSIZE-1][SUBSIZE-1] ;
     int fill ;
     int mask ;
 } State[MAXTRACK] ;
