@@ -656,64 +656,63 @@ void WS3_order( void ) {
 
 // big diagonals as well
 int X_fill_square( void ) {
-    int si,sj,ssi,ssj,fill ;
-    int col_bits[SIZE] ;
-    int row_bits[SIZE] ;
-    int ss_bits[SUBSIZE][SUBSIZE] ;
-    int diag1=0 ;
-    int diag2=0;
+    struct FillState * pFS = StateStackInit() ;
+    
     Zero(bit) ;
     
-    // column bits culmulative
-    Zero( col_bits ) ;
-    
-    // row bits culmulative
-    Zero( row_bits ) ;
-    
-    // subsquare bits culmulative
-    Zero( ss_bits ) ;
-    
-    // Fill columns and rows
-    for ( fill=0 ; fill < TOTALSIZE ; ++fill ) {
-        int i = order[fill].i ;
-        int j = order[fill].j ;
+    for ( pFS->fill=0 ; pFS->fill<TOTALSIZE ; ) {
+        int i = order[pFS->fill].i ;
+        int j = order[pFS->fill].j ;
         int si = i / SUBSIZE ;
         int sj = j / SUBSIZE ;
-        int m = col_bits[j]|row_bits[i]|ss_bits[si][sj] ;
+        int m = pFS->col_bits[j]|pFS->row_bits[i]|pFS->ss_bits[si][sj]|pFS->mask ;
+        int Xu, Xd ;
         int b ;
         if ( i != j ) { // not main diagonal
-            if ( SIZE-i != j ) { // not any diagonal
+            if ( SIZE-1-i != j ) { // not any diagonal
                 b = find_valid_bit( m ) ;
-                if (b == 0 ) {
-                    return fill+1 ;
-                }
+                Xu = Xd = 0 ;
             } else { // second diagonal
-                b = find_valid_bit( m|diag2 ) ;
-                if (b == 0 ) {
-                    return fill+1 ;
-                }
-                diag2|=b ;
+                b = find_valid_bit( m|pFS->Xup ) ;
+                Xu = b ; 
+                Xd = 0;
             }
         } else {
-            if ( SIZE-i != j ) { // first diagonal
-                b = find_valid_bit( m|diag1 ) ;
-                if (b == 0 ) {
-                    return fill+1 ;
-                }
-                diag1 |= b ;
+            if ( SIZE-1-i != j ) { // first diagonal
+                b = find_valid_bit( m|pFS->Xdown ) ;
+                Xu = 0 ;
+                Xd = b ;
             } else { // Both diagonals (center)
-                b = find_valid_bit( m|diag2|diag1 ) ;
-                if (b == 0 ) {
-                    return fill+1 ;
-                }
-                diag2|=b ;
-                diag1|=b ;
+                b = find_valid_bit( m|pFS->Xup|pFS->Xdown ) ;
+                Xu = Xd = b ;
             }
         }
-        row_bits[i] |= b ;
-        col_bits[j] |= b ;
-        ss_bits[si][sj] |= b ;
+        if (b == 0 ) {
+            int fill = pFS->fill ;
+            //check if alternative exists
+            if ( (pFS = StateStackPop()) ) {
+                // try with old position and data (but the prior choice is added to the exclusions)
+                continue ;
+            }
+            return fill+1 ;
+        }
+
+        // See if a backup spot
+        if ( (pFS->fill > SIZE) && ((b|m) != full_pattern) ) {
+            pFS->mask |= b ;
+            pFS = StateStackPush() ;
+        }
+        
+        pFS->Xup |= Xu ;
+        pFS->Xdown |= Xd ;
+        pFS->row_bits[i] |= b ;
+        pFS->col_bits[j] |= b ;
+        pFS->ss_bits[si][sj] |= b ;
+
         bit[i][j] = b ;
+
+        pFS->mask = 0 ;
+        ++pFS->fill ;
     }
     return TOTALSIZE ;
 }
@@ -770,9 +769,10 @@ void help(char * prog) {
     "\n"
     "options:\n"
     "\t -t [1|2|3|4]\tSearch columns first, then test for subsquares (default)\n"
-    "\t -s [1|2|3]\tSearch subsquares, show failure point\n"
-    "\t -w [1|2|3|4]\tSearch whole square, show failure point\n"
-    "\t -x [1|2|3|4]\tAlso main diagonals are unique (added constraint), show failure point\n"
+    "\t -s [1|2|3]\tSearch pattern subsquares\n"
+    "\t -w [1|2|3|4]\tSearch pattern whole square\n"
+    "\t -X [1|2|3|4]\tMain diagonals unique (Added constraint)\n"
+    "\t -W [1|2|3|4]\tWindows unique (Added constraint)\n"
     "\t\t 1 -- by column\n"
     "\t\t 2 -- alternating column/row\n"
     "\t\t 3 -- diagonal\n"
@@ -807,7 +807,7 @@ int main(int argc, char ** argv) {
     
     WS1_order() ; //default
     
-    while ( (c = getopt( argc, argv, "hoqx:t:w:s:f:d:g:b:" )) != -1 ) {
+    while ( (c = getopt( argc, argv, "hoqW:X:t:w:s:f:d:g:b:" )) != -1 ) {
         switch(c) 
         {
             case 't':
@@ -883,7 +883,7 @@ int main(int argc, char ** argv) {
                         break ;
                 }
                 break ;
-            case 'x':
+            case 'X':
                 loop = SSLoop ;
                 type = "x Columns X-square" ;
                 fill = X_fill_square ;
