@@ -885,7 +885,7 @@ int main(int argc, char ** argv) {
                 break ;
             case 'X':
                 loop = SSLoop ;
-                type = "x Columns X-square" ;
+                type = "X Columns X-square" ;
                 fill = X_fill_square ;
                 switch (optarg[0]) {
                     case '4':
@@ -967,7 +967,7 @@ int main(int argc, char ** argv) {
         exit(1) ;
     }
     
-    if ( statestack.size > 0 && fill != SS_fill_square ) {
+    if ( statestack.size > 1 && fill == Type_fill_square ) {
         fprintf(stderr,"Backup (-b) option not implemented for %s - %s\n",key,type);
         fprintf(stderr,"Ignoring Backup\n");
         StateStackCreate( 0 ) ;
