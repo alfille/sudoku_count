@@ -18,8 +18,10 @@
 #include <inttypes.h>
 
 // SIZE x SIZE sudoku board
-#define SIZE (9)
-# define SUBSIZE (3) // sqrt of SIZE
+#ifndef SUBSIZE
+#define SUBSIZE 3
+#endif
+#define SIZE (SUBSIZE*SUBSIZE)
 # define TOTALSIZE (SIZE*SIZE)
 
 # define MAXCONSTRAINT (3*SIZE)
