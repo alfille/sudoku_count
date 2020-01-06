@@ -473,6 +473,54 @@ int SS_fill_square( void ) {
     }
     return TOTALSIZE ;
 }
+int W_fill_square( void ) {
+    
+    struct FillState * pFS = StateStackInit() ;
+    
+    Zero(bit) ;
+    
+    for ( pFS->fill=0 ; pFS->fill<TOTALSIZE ; ) {
+        int i = order[pFS->fill].i ;
+        int j = order[pFS->fill].j ;
+        int si = i / SUBSIZE ;
+        int sj = j / SUBSIZE ;
+        int iswin = ( i % (SUBSIZE+1) ) && ( j % (SUBSIZE+1) ) ;
+        int m = pFS->col_bits[j]|pFS->row_bits[i]|pFS->ss_bits[si][sj]|pFS->mask ;
+        int b ;
+        if ( iswin ) {
+            m |= pFS->Window[i/(SUBSIZE+1)][j/(SUBSIZE+1)] ;
+        }
+        b = find_valid_bit( m ) ;
+        if (b == 0 ) {
+            int fill = pFS->fill ;
+            //check if alternative exists
+            if ( (pFS = StateStackPop()) ) {
+                // try with old position and data (but the prior choice is added to the exclusions)
+                continue ;
+            }
+            return fill+1 ;
+        }
+
+        // See if a backup spot
+        if ( (pFS->fill > SIZE) && ((b|m) != full_pattern) ) {
+            pFS->mask |= b ;
+            pFS = StateStackPush() ;
+        }
+        
+        pFS->row_bits[i] |= b ;
+        pFS->col_bits[j] |= b ;
+        pFS->ss_bits[si][sj] |= b ;
+        if ( iswin ) {
+            pFS->Window[i/(SUBSIZE+1)][j/(SUBSIZE+1)] |= b ;
+        }
+
+        bit[i][j] = b ;
+
+        pFS->mask = 0 ;
+        ++pFS->fill ;
+    }
+    return TOTALSIZE ;
+}
 
 void SS1_order( void ) {
     int si,sj,ssi,ssj,filled=-1 ;
@@ -891,23 +939,50 @@ int main(int argc, char ** argv) {
                 fill = X_fill_square ;
                 switch (optarg[0]) {
                     case '4':
-                        key = "x4" ;
+                        key = "X4" ;
                         type = "Least constrained with X" ;
                         WS4_order() ;
                         break ;
                     case '3':
-                        key = "x3" ;
+                        key = "X3" ;
                         type = "Diagonal with X" ;
                         WS3_order() ;
                         break ;
                     case '2':
-                        key = "x2" ;
+                        key = "X2" ;
                         type = "Alternating with X" ;
                         WS2_order() ;
                         break ;
                     default:
-                        key = "x1" ;
-                        type = "Columns wint X" ;
+                        key = "X1" ;
+                        type = "Columns with X" ;
+                        WS1_order() ;
+                        break ;
+                }
+                break ;
+            case 'W':
+                loop = SSLoop ;
+                type = "W Columns Windows" ;
+                fill = W_fill_square ;
+                switch (optarg[0]) {
+                    case '4':
+                        key = "W4" ;
+                        type = "Least constrained with Windows" ;
+                        WS4_order() ;
+                        break ;
+                    case '3':
+                        key = "W3" ;
+                        type = "Diagonal with Windows" ;
+                        WS3_order() ;
+                        break ;
+                    case '2':
+                        key = "W2" ;
+                        type = "Alternating with Windows" ;
+                        WS2_order() ;
+                        break ;
+                    default:
+                        key = "W1" ;
+                        type = "Columns with Windows" ;
                         WS1_order() ;
                         break ;
                 }
