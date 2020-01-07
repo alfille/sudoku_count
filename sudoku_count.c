@@ -404,7 +404,7 @@ void TypeLoop( int (*fill)(void) ) {
     uint64_t good=0;
     uint64_t count ;
 
-    for (count=0;count<=max_tries;++count ) {
+    for (count=1;count<=max_tries;++count ) {
         int f = fill() ;
         switch( f ) {
             case -1:
@@ -783,7 +783,7 @@ void SSLoop( int (*fill)(void) ) {
     uint64_t good = 0 ;
     uint64_t totalcount = 0 ;
 
-    for ( count=0; count<=max_tries; ++count ) {
+    for ( count=1; count<=max_tries; ++count ) {
         int filled = fill() ;
         totalcount += filled ;
         ++distribution[filled] ;

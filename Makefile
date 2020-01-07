@@ -6,6 +6,8 @@ RAN = xoshiro256starstar.o
 OBJLC = least_connected.o
 OBJMC = most_connected.o
 
+.DEFAULT_GOAL := all
+
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
