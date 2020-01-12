@@ -17,7 +17,18 @@ class Sudoku(tk.Frame):
 		#self.pack()
 		self.create_widgets()
 		self.create_menu()
+		self.win.update()
+		self.set_win_sizes()
 
+	def set_win_sizes( self ):
+		self.tilex=self.but[0][0].winfo_width()
+		self.tiley=self.but[0][0].winfo_height()
+		self.popx = self.tilex*self.SUBSIZE
+		self.popy = self.tiley*self.SUBSIZE
+		self.winx = self.win.winfo_screenwidth()
+		self.winy = self.win.winfo_screenheight()
+		
+	
 	def set_square(self,i,j,n):
 		self.but[i][j].configure(text=n)
 		self.sq_popup_done( i , j )
@@ -28,23 +39,35 @@ class Sudoku(tk.Frame):
 			
 	
 	def sq_popup( self,i,j):
-		print("Pressed: "+repr(i)+" "+repr(j)+" \n")
 		self.but[i][j].configure(relief="sunken")
 		self.pop=tk.Toplevel()
+		
+		# figure location
+		self.win.update()
+		x = self.but[i][j].winfo_rootx()+self.tilex
+		y = self.but[i][j].winfo_rooty()
+		if x+self.popx > self.winx:
+			x -= self.tilex+self.popx
+		if x<0:
+			x=0
+		if y+self.popy > self.winy:
+			y = self.winy - self.popy
+		self.pop.geometry('+%d+%d' % (x,y) )
+		
 		for si in range(self.SUBSIZE):
 			for sj in range(self.SUBSIZE):
 				n = si*self.SUBSIZE+sj
 				tk.Button(self.pop,text=str(n),borderwidth=4,height=2,width=3,font=self.font,command=lambda i=i,j=j,n=str(n): self.set_square(i,j,n)).grid(row=si,column=sj)
 		tk.Button(self.pop,text="Clear",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j,n=" ": self.set_square(i,j,n)).grid(columnspan=self.SUBSIZE,sticky="EW")
 		tk.Button(self.pop,text="Back",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j: self.sq_popup_done(i,j)).grid(columnspan=self.SUBSIZE,sticky="EW")
-#		self.pop.pack()
+		self.pop.grab_set()
 
 	def create_widgets(self):
-		self.win = tk.Grid()
+		self.win = self.master
 		self.but = [[0 for i in range(self.SIZE)] for j in range(self.SIZE)]
 		for si in range(self.SUBSIZE):
 			for sj in range(self.SUBSIZE):
-				f = tk.Frame(self.master,background=self.color[(si+sj)%2],borderwidth=2,relief="flat")
+				f = tk.Frame(self.win,background=self.color[(si+sj)%2],borderwidth=2,relief="flat")
 				f.grid(row=si,column=sj)
 				for ssi in range(self.SUBSIZE):
 					for ssj in range(self.SUBSIZE):
@@ -68,11 +91,11 @@ class Sudoku(tk.Frame):
 		print("Sudoku Solve by Paul Alfille 2020")
 	
 	def create_menu(self):
-		self.menu = tk.Menu(self.master,tearoff=0)
+		self.menu = tk.Menu(self.win,tearoff=0)
 		self.helpmenu = tk.Menu(self.menu,tearoff=0)
 		self.menu.add_cascade(label="Help",menu=self.helpmenu)
 		self.helpmenu.add_command(label="About",command=self.about)
-		self.master.config(menu=self.menu)
+		self.win.config(menu=self.menu)
 
 	def say_hi(self):
 		print("hi there, everyone!")
