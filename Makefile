@@ -11,6 +11,9 @@ OBJMC = most_connected.o
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
+%.so: %.c $(DEPS)
+	$(CC) -fPIC -shared -o $@ $< $(CFLAGS)
+
 sudoku_count: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS)
 
@@ -35,4 +38,4 @@ least_connected: $(OBJLC)
 most_connected: $(OBJMC)
 	$(CC) -o $@ $^ $(CFLAGS)
 
-all: sudoku_count sudoku_count36 sudoku_count25 sudoku_count16 sudoku_count9 sudoku_count4 least_connected most_connected
+all: sudoku_count sudoku_count36 sudoku_count25 sudoku_count16 sudoku_count9 sudoku_count4 least_connected most_connected sudoku_lib.so
