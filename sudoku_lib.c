@@ -298,9 +298,9 @@ struct FillState * Next_move( struct FillState * pFS, int * done ) {
 	return Set_Square( pFS, fi, fj ) ;
 }
 
-int SolveLoop( void ) {
+struct FillState * SolveLoop( void ) {
 	int done = 0 ;
-	struct FillState * pFS = StateStackReset() ;
+	struct FillState * pFS = StateStackReset() ; // get rid of stack so can't backup preset
 	
 	while ( done == 0 ) {
 		pFS = Next_move( pFS , &done ) ;
@@ -308,10 +308,79 @@ int SolveLoop( void ) {
 			pFS = StateStackPop() ;
 		}
 		if ( pFS == NULL ) {
-			return 0 ;
+			return NULL ;
 		}
 	}
 	print_square( pFS ) ;
+	return pFS ;
+}
+
+
+
+int Setup_board( int * preset ) {
+	// preset is an array of TOTALSIZE length
+	// sent from python
+	// only values on (0 -- SIZE-1) accepted
+	// rest ignored
+	// so use -1 for enpty cells
+	
+	int i, j ;
+	int * set = preset ; // pointer though preset array
+	struct FillState * pFS ;
+	
+	StateStackCreate( TOTALSIZE - 1 ) ;
+	pFS = StateStackInit( ) ;
+	
+	for ( i=0 ; i<SIZE ; ++i ) {
+		for ( j=0 ; j<SIZE ; ++j ) {
+			if ( set[0] > -1 && set[0] < SIZE ) {
+				pFS->free_state[i][j] = VAL2FREE( set[0] ) ;
+				pFS = Set_Square( pFS, i, j ) ;
+				if ( pFS == NULL ) {
+					// bad input 
+					return 0 ;
+				}
+			}
+			++set ; // move to next entry
+		}
+	}
 	return 1 ;
 }
 
+int Return_board( int * preset, struct FillState * pFS ) {
+	int i, j ;
+	int * set = preset ; // pointer though preset array
+	
+	if ( pFS ) {
+		// solved
+		for ( i=0 ; i<SIZE ; ++i ) {
+			for ( j=0 ; j<SIZE ; ++j ) {
+				set[0] = FREE2VAL( pFS->free_state[i][j] ) ;
+				++set ; // move to next entry
+			}
+		}
+		return 1 ;
+	} else {
+		// unsolvable
+		return 0 ;
+	}
+}
+	
+int Solve( int * preset ) {
+	if ( Setup_board( preset ) ) {
+		return Return_board( preset, SolveLoop() ) ;
+	} else {
+		// bad input (inconsistent soduku)
+		return Return_board( preset, NULL ) ;
+	}
+}
+	
+int Test( int * test ) {
+	int i ;
+	for (i=0 ; i<20 ; ++i ) {
+		printf("%d\n",test[i]);
+	}
+	test[4] = 1 ;
+	return 1 ;
+}
+	

@@ -2,6 +2,8 @@ import sys
 import tkinter as tk
 import tkinter.font as tkfont
 import argparse
+import ctypes
+import platform
 
 class Sudoku(tk.Frame):
 	SUBSIZE = 3
@@ -83,10 +85,7 @@ class Sudoku(tk.Frame):
 		#self.quit = tk.Button(self, text="QUIT", fg="red",
 		#					  command=self.master.destroy)
 		#self.quit.pack(side="bottom")
-		
-	def choose(self):
-		print
-	
+			
 	def about(self):
 		print("Sudoku Solve by Paul Alfille 2020")
 	
@@ -97,10 +96,31 @@ class Sudoku(tk.Frame):
 		self.helpmenu.add_command(label="About",command=self.about)
 		self.win.config(menu=self.menu)
 
-	def say_hi(self):
-		print("hi there, everyone!")
-
 def main(args):
+
+	# Shared C library
+	lib_base = "./" #location
+	lib_base += "sudoku_lib" # base name	
+
+	# get the right filename
+	if platform.uname()[0] == "Windows":
+		lib_base += ".dll" 
+	if platform.uname()[0] == "Linux":
+		lib_base += ".so" 
+	else:
+		lib_base += ".dylib" 
+
+	# load library
+	global solve_lib
+	solve_lib = ctypes.cdll.LoadLibrary(lib_base)
+	
+	 
+	arr = (ctypes.c_int * 20)(*range(20))
+	print( solve_lib.Test( arr ) )
+	print(arr)
+	for v in arr:
+		print(v)
+
 	root = tk.Tk()
 	app = Sudoku(master=root)
 	app.mainloop()
