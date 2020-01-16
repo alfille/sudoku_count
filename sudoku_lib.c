@@ -24,19 +24,11 @@
 #define SIZE (SUBSIZE*SUBSIZE)
 # define TOTALSIZE (SIZE*SIZE)
 
-# define MAXCONSTRAINT (3*SIZE)
-
-char * key = "?" ;
-
 #define Zero(array) memset( array, 0, sizeof(array) ) ;
-
-uint64_t max_tries = UINT64_MAX / TOTALSIZE ;
 
 // bit pattern
 int pattern[SIZE] ;
 int full_pattern ;
-
-uint64_t distribution[TOTALSIZE+1];
 
 // Make numbers int bit pattern (1=0x1 2=0x2 3=0x4...)
 void make_pattern(void) {
