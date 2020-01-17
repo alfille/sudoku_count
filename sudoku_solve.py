@@ -58,14 +58,46 @@ class Sudoku(tk.Frame):
 		
 		for si in range(self.SUBSIZE):
 			for sj in range(self.SUBSIZE):
-				n = si*self.SUBSIZE+sj
+				n = si*self.SUBSIZE+sj+1
 				tk.Button(self.pop,text=str(n),borderwidth=4,height=2,width=3,font=self.font,command=lambda i=i,j=j,n=str(n): self.set_square(i,j,n)).grid(row=si,column=sj)
 		tk.Button(self.pop,text="Clear",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j,n=" ": self.set_square(i,j,n)).grid(columnspan=self.SUBSIZE,sticky="EW")
 		tk.Button(self.pop,text="Back",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j: self.sq_popup_done(i,j)).grid(columnspan=self.SUBSIZE,sticky="EW")
 		self.pop.grab_set()
 
+	def clear(self):
+		for i in range(self.SIZE):
+			for j in range(self.SIZE):
+				self.but[i][j].configure(text=" ")
+				
+	def solve(self):
+		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
+		k = 0
+		for i in range(self.SIZE):
+			for j in range(self.SIZE):
+				arr[k] = -1 # default blank
+				t = self.but[i][j]['text']
+				if t != " ":
+					arr[k] = int(t)
+				++k
+		solve_lib.Solve(arr)
+		k = 0
+		for i in range(self.SIZE):
+			for j in range(self.SIZE):
+				if arr[k] >= 0 :
+					self.but[i][j].configure(text=str(arr[k]))
+				else:
+					self.but[i][j].configure(text=" ")
+				++k	
+	
 	def create_widgets(self):
-		self.win = self.master
+		self.win = tk.Frame(self.master,borderwidth=2,relief="flat",background="white")
+		self.win.pack(side="top")
+		self.buttons=tk.Frame(self.master,borderwidth=2,relief="flat",background="white")
+		tk.Button(self.buttons,text="Solve",command=self.solve).pack(side="left")
+		tk.Button(self.buttons,text="Clear",command=self.clear).pack(side="left")
+		tk.Button(self.buttons,text="Exit",command=self.solve).pack(side="left")
+		self.buttons.pack(side="bottom")
+	
 		self.but = [[0 for i in range(self.SIZE)] for j in range(self.SIZE)]
 		for si in range(self.SUBSIZE):
 			for sj in range(self.SUBSIZE):
@@ -90,17 +122,19 @@ class Sudoku(tk.Frame):
 		print("Sudoku Solve by Paul Alfille 2020")
 	
 	def create_menu(self):
-		self.menu = tk.Menu(self.win,tearoff=0)
+		self.menu = tk.Menu(self.master,tearoff=0)
 		self.helpmenu = tk.Menu(self.menu,tearoff=0)
 		self.menu.add_cascade(label="Help",menu=self.helpmenu)
 		self.helpmenu.add_command(label="About",command=self.about)
-		self.win.config(menu=self.menu)
+		self.master.config(menu=self.menu)
 
 def main(args):
 
 	# Shared C library
 	lib_base = "./" #location
-	lib_base += "sudoku_lib" # base name	
+	lib_base += "sudoku_lib" # base name
+	
+	lib_base += str(Sudoku.SUBSIZE*Sudoku.SUBSIZE)	
 
 	# get the right filename
 	if platform.uname()[0] == "Windows":

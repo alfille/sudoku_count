@@ -53,7 +53,8 @@ int reverse_pattern( int pat ) {
 }
 
 // For backtracking state
-#define MAXTRACK 80
+#define MAXTRACK TOTALSIZE
+
 struct FillState {
     int mask_bits[SIZE][SIZE] ;
     int free_state[SIZE][SIZE] ;
@@ -63,28 +64,13 @@ struct StateStack {
     int size ;
     int start ;
     int end ;
-    char * back ;
-} statestack = { 0,0,0,NULL };
-
-void StateStackCreate( int size ) {
-    if ( size < 0 ) {
-        fprintf(stderr,"Backtracking depth %d corrected to %d\n",size,0);
-        size = 0 ;
-    } else if ( size > MAXTRACK-1 ) {
-        fprintf(stderr,"Backtracking depth %d corrected to %d\n",size,MAXTRACK-1);
-        size = MAXTRACK-1 ;
-    }
-    statestack.size = size+1 ;
-    if ( statestack.back == NULL ) {
-        statestack.back = malloc( 11 ) ;
-    }
-    snprintf( statestack.back, 10, "B%d" , size ) ;    
-}
+} statestack = { 0,0,0 };
 
 #define VAL2FREE( v ) ( -((v)+1) )
 #define FREE2VAL(f ) ( -((f)+1) )
 
 struct FillState * StateStackInit ( void ) {
+    statestack.size = TOTALSIZE ;
     statestack.start = statestack.end = 0 ;
     memset( & State[0].mask_bits, 0, sizeof( State[0].mask_bits ) ) ;
     memset( & State[0].free_state, SIZE, sizeof( State[0].free_state ) ) ;
@@ -96,9 +82,6 @@ struct FillState * StateStackReset( void ) {
 	statestack.start = statestack.end ;
 	return & State[statestack.end] ;
 }
-
-
-
 
 struct FillState * StateStackPush( void ) {
     if ( statestack.size == 0 ) {
@@ -318,10 +301,7 @@ int Setup_board( int * preset ) {
 	
 	int i, j ;
 	int * set = preset ; // pointer though preset array
-	struct FillState * pFS ;
-	
-	StateStackCreate( TOTALSIZE - 1 ) ;
-	pFS = StateStackInit( ) ;
+	struct FillState * pFS = StateStackInit( ) ;
 	
 	for ( i=0 ; i<SIZE ; ++i ) {
 		for ( j=0 ; j<SIZE ; ++j ) {
@@ -359,6 +339,8 @@ int Return_board( int * preset, struct FillState * pFS ) {
 }
 	
 int Solve( int * preset ) {
+	make_pattern() ;
+	
 	if ( Setup_board( preset ) ) {
 		return Return_board( preset, SolveLoop() ) ;
 	} else {
