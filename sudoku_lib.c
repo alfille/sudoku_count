@@ -125,7 +125,8 @@ void print_square( struct FillState * pFS ) {
 	for (i=0 ; i<SIZE ; ++i ) { // each row
 		for ( j=0 ; j<SIZE ; ++j ) {
 			int c = (j%SUBSIZE)?':':'|' ;
-			fprintf(stderr,"%c%2X ",c,reverse_pattern(FREE2VAL(pFS->free_state[i][j])));
+            int v = FREE2VAL( pFS->free_state[i][j] );
+			fprintf(stderr,"%c%2X ",c,v>0?v:0);
 		}
 		// end of row
 		fprintf(stderr,"|\n");
@@ -242,7 +243,8 @@ struct FillState * Next_move( struct FillState * pFS, int * done ) {
 	int minfree = SIZE + 1 ;
 	int fi, fj ;
 	
-	for ( i=0 ; i < SIZE ; ++i ) {
+    print_square( pFS ) ;
+    for ( i=0 ; i < SIZE ; ++i ) {
 		for ( j=0 ; j< SIZE ; ++j ) {
 			int free_state = pFS->free_state[i][j] ;
 			if ( free_state < 0 ) {
