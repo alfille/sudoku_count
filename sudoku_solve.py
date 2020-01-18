@@ -58,7 +58,7 @@ class Sudoku(tk.Frame):
 		
 		for si in range(self.SUBSIZE):
 			for sj in range(self.SUBSIZE):
-				n = si*self.SUBSIZE+sj+1
+				n = si*self.SUBSIZE+sj+1				
 				tk.Button(self.pop,text=str(n),borderwidth=4,height=2,width=3,font=self.font,command=lambda i=i,j=j,n=str(n): self.set_square(i,j,n)).grid(row=si,column=sj)
 		tk.Button(self.pop,text="Clear",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j,n=" ": self.set_square(i,j,n)).grid(columnspan=self.SUBSIZE,sticky="EW")
 		tk.Button(self.pop,text="Back",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j: self.sq_popup_done(i,j)).grid(columnspan=self.SUBSIZE,sticky="EW")
@@ -75,19 +75,21 @@ class Sudoku(tk.Frame):
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
 				arr[k] = -1 # default blank
-				t = self.but[i][j]['text']
+				t = self.but[i][j].cget('text')
 				if t != " ":
-					arr[k] = int(t)
-				++k
+					arr[k] = int(t)-1 # 0-based values for squares
+					#print(i,j,k,arr[k])
+				#print("{} -> {}".format(k,arr[k]))
+				k += 1
 		solve_lib.Solve(arr)
 		k = 0
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
 				if arr[k] >= 0 :
-					self.but[i][j].configure(text=str(arr[k]))
+					self.but[i][j].configure(text=str(arr[k]+1)) # 1-based text values
 				else:
 					self.but[i][j].configure(text=" ")
-				++k	
+				k += 1
 	
 	def create_widgets(self):
 		self.win = tk.Frame(self.master,borderwidth=2,relief="flat",background="white")
@@ -149,11 +151,11 @@ def main(args):
 	solve_lib = ctypes.cdll.LoadLibrary(lib_base)
 	
 	 
-	arr = (ctypes.c_int * 20)(*range(20))
-	print( solve_lib.Test( arr ) )
-	print(arr)
-	for v in arr:
-		print(v)
+	#arr = (ctypes.c_int * 20)(*range(20))
+	#print( solve_lib.Test( arr ) )
+	#print(arr)
+	#for v in arr:
+	#	print(v)
 
 	root = tk.Tk()
 	app = Sudoku(master=root)

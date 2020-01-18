@@ -26,6 +26,10 @@
 
 #define Zero(array) memset( array, 0, sizeof(array) ) ;
 
+#define VAL2FREE( v ) ( -((v)+1) )
+#define FREE2VAL( f ) ( -((f)+1) )
+
+
 // bit pattern
 int pattern[SIZE] ;
 int full_pattern ;
@@ -66,22 +70,19 @@ struct StateStack {
     int end ;
 } statestack = { 0,0,0 };
 
-#define VAL2FREE( v ) ( -((v)+1) )
-#define FREE2VAL(f ) ( -((f)+1) )
-
 struct FillState * StateStackInit ( void ) {
+	int i,j ;
     statestack.size = TOTALSIZE ;
     statestack.start = statestack.end = 0 ;
-    memset( & State[0].mask_bits, 0, sizeof( State[0].mask_bits ) ) ;
-    memset( & State[0].free_state, SIZE, sizeof( State[0].free_state ) ) ;
+	for ( i=0 ; i<SIZE ; ++i ) {
+		for ( j=0 ; j<SIZE ; ++j ) {
+			State[0].mask_bits[i][j] = 0 ;
+			State[0].free_state[i][j] = SIZE ;
+		}
+	}
     return & State[0] ;
 }
 
-struct FillState * StateStackReset( void ) {
-	// Clear stack, use current as top of
-	statestack.start = statestack.end ;
-	return & State[statestack.end] ;
-}
 
 struct FillState * StateStackPush( void ) {
     if ( statestack.size == 0 ) {
@@ -126,7 +127,7 @@ void print_square( struct FillState * pFS ) {
 		for ( j=0 ; j<SIZE ; ++j ) {
 			int c = (j%SUBSIZE)?':':'|' ;
             int v = FREE2VAL( pFS->free_state[i][j] );
-			fprintf(stderr,"%c%2X ",c,v>0?v:0);
+			fprintf(stderr,"%c%2X ",c,v>=0?v:0xA);
 		}
 		// end of row
 		fprintf(stderr,"|\n");
@@ -144,33 +145,49 @@ void print_square( struct FillState * pFS ) {
 	fprintf(stderr,"\n");
 }   
 
-struct FillState * Set_Square( struct FillState * pFSold, int testi, int testj ) {
+// Enter with current position set in free_state
+struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 	int si, sj, k ;
-	int val ;
-	int mask = pFSold->mask_bits[testi][testj] ;
+	int val = FREE2VAL( pFS->free_state[testi][testj] );
 	int b ;
-	struct FillState * pFS = pFSold ;
-	
-	// find clear bit
-	for ( val = 0 ; val < SIZE ; ++val ) {
-		b = pattern[val] ;
-		if ( b & mask == 0 ) {
-			break ;
-		}
-	}
-	// should never fall though
+	//char debug ;
+	//printf("Set %d %d bit=%X mask=%X\n",testi,testj,pFS->free_state[testi][testj],pFS->mask_bits[testi][testj]);
+	//debug = getchar() ;
 
-	// point
-	pFS->mask_bits[testi][testj] |= b ;
-	--pFS->free_state[testi][testj] ;
+	if ( val >= 0 ) {
+		// already set (preset from GUI)
+		//fprintf(stderr,"Set: Position %d,%d already set\n",testi,testj) ;
+		b = pattern[val] ;
+		// point mask
+		pFS->mask_bits[testi][testj] |= b ;
+	} else {
+		// Not already set (Part of solve search)
+		// find clear bit
+		int mask = pFS->mask_bits[testi][testj] ;
+		for ( val = 0 ; val < SIZE ; ++val ) {
+			b = pattern[val] ;
+			//printf("val=%d b=%X mask=%X b&mask=%X\n",val,b,mask,b&mask ) ;
+			if ( (b & mask) == 0 ) {
+				//printf("Try val %d at %d,%d\n",val,testi,testj);
+				break ;
+			}
+		}
+		// should never fall though
+
+		// point
+		pFS->mask_bits[testi][testj] |= b ;
+		--pFS->free_state[testi][testj] ;
+		
+		// Push state (with current choice masked out) if more than one choice
+		if ( pFS->free_state[testi][testj] > 0 ) {
+			pFS = StateStackPush() ;
+		}
+		// Now set this choice
+		pFS->free_state[testi][testj] = VAL2FREE(val) ;
 	
-	// Push state (with current choice masked out) if more than one choice
-	if ( pFS->free_state[testi][testj] > 0 ) {
-		pFS = StateStackPush() ;
 	}
-	// Now set this choice
-	pFS->free_state[testi][testj] = VAL2FREE(val) ;
-	
+
+
 	// mask out row everywhere else
 	for( k=0 ; k<SIZE ; ++k ) {
 		// row
@@ -243,20 +260,26 @@ struct FillState * Next_move( struct FillState * pFS, int * done ) {
 	int minfree = SIZE + 1 ;
 	int fi, fj ;
 	
-    print_square( pFS ) ;
+	done[0] = 0 ; //assume not done
+	
+    //print_square( pFS ) ;
     for ( i=0 ; i < SIZE ; ++i ) {
 		for ( j=0 ; j< SIZE ; ++j ) {
 			int free_state = pFS->free_state[i][j] ;
 			if ( free_state < 0 ) {
 				// already set
+				//printf("Slot %d,%d already set\n",i,j);
 				continue ;		
 			}
 			if ( free_state == 0 ) {
+				//printf("Slot %d,%d exhausted\n",i,j);
 				return NULL ;
 			}
 			if ( free_state == 1 ) {
+				//printf("Slot %d,%d exactly specified\n",i,j);
 				return Set_Square( pFS, i, j ) ;
 			}
+			//printf("Minfree %d free_state %d\n",minfree,free_state);
 			if ( free_state < minfree ) {
 				minfree = free_state ;
 				fi = i ;
@@ -267,19 +290,20 @@ struct FillState * Next_move( struct FillState * pFS, int * done ) {
 	if ( minfree == SIZE+1 ) {
 		// only set squares -- Victory
 		// only set squares -- Victory
-		* done = 1 ;
+		done[0] = 1 ; // all done
 		return pFS ;
 	}
 	
 	// Try smallest choice (most constrained)
+	//printf("Slot %d,%d will be probed (free %d)\n",fi,fj,minfree);
 	return Set_Square( pFS, fi, fj ) ;
 }
 
-struct FillState * SolveLoop( void ) {
+struct FillState * SolveLoop( struct FillState * pFS ) {
 	int done = 0 ;
-	struct FillState * pFS = StateStackReset() ; // get rid of stack so can't backup preset
 	
 	while ( done == 0 ) {
+		//printf("Solveloop\n");
 		pFS = Next_move( pFS , &done ) ;
 		if ( pFS == NULL ) {
 			pFS = StateStackPop() ;
@@ -288,13 +312,13 @@ struct FillState * SolveLoop( void ) {
 			return NULL ;
 		}
 	}
-	print_square( pFS ) ;
+	//print_square( pFS ) ;
 	return pFS ;
 }
 
 
 
-int Setup_board( int * preset ) {
+struct FillState * Setup_board( int * preset ) {
 	// preset is an array of TOTALSIZE length
 	// sent from python
 	// only values on (0 -- SIZE-1) accepted
@@ -305,20 +329,25 @@ int Setup_board( int * preset ) {
 	int * set = preset ; // pointer though preset array
 	struct FillState * pFS = StateStackInit( ) ;
 	
+	//printf("LIB\n") ;
+	make_pattern() ; // set up bit pattern list
+	
 	for ( i=0 ; i<SIZE ; ++i ) {
 		for ( j=0 ; j<SIZE ; ++j ) {
 			if ( set[0] > -1 && set[0] < SIZE ) {
 				pFS->free_state[i][j] = VAL2FREE( set[0] ) ;
+				//print_square( pFS ) ;
+				//printf("LIB: %d -> %d -> %d\n",set[0],VAL2FREE(set[0]),FREE2VAL(VAL2FREE(set[0])));
 				pFS = Set_Square( pFS, i, j ) ;
 				if ( pFS == NULL ) {
 					// bad input 
-					return 0 ;
+					return NULL ;
 				}
 			}
 			++set ; // move to next entry
 		}
 	}
-	return 1 ;
+	return pFS ;
 }
 
 int Return_board( int * preset, struct FillState * pFS ) {
@@ -341,22 +370,13 @@ int Return_board( int * preset, struct FillState * pFS ) {
 }
 	
 int Solve( int * preset ) {
-	make_pattern() ;
+	struct FillState * pFS = Setup_board( preset ) ;
 	
-	if ( Setup_board( preset ) ) {
-		return Return_board( preset, SolveLoop() ) ;
+	if ( pFS ) {
+		return Return_board( preset, SolveLoop( pFS ) ) ;
 	} else {
 		// bad input (inconsistent soduku)
 		return Return_board( preset, NULL ) ;
 	}
-}
-	
-int Test( int * test ) {
-	int i ;
-	for (i=0 ; i<20 ; ++i ) {
-		printf("%d\n",test[i]);
-	}
-	test[4] = 1 ;
-	return 1 ;
 }
 	
