@@ -91,13 +91,16 @@ class Sudoku(tk.Frame):
 					self.but[i][j].configure(text=" ")
 				k += 1
 	
+	def Quit(self):
+		self.master.destroy()
+	
 	def create_widgets(self):
 		self.win = tk.Frame(self.master,borderwidth=2,relief="flat",background="white")
 		self.win.pack(side="top")
 		self.buttons=tk.Frame(self.master,borderwidth=2,relief="flat",background="white")
 		tk.Button(self.buttons,text="Solve",command=self.solve).pack(side="left")
 		tk.Button(self.buttons,text="Clear",command=self.clear).pack(side="left")
-		tk.Button(self.buttons,text="Exit",command=self.solve).pack(side="left")
+		tk.Button(self.buttons,text="Exit",command=self.Quit).pack(side="left")
 		self.buttons.pack(side="bottom")
 	
 		self.but = [[0 for i in range(self.SIZE)] for j in range(self.SIZE)]
@@ -151,15 +154,7 @@ def main(args):
 	solve_lib = ctypes.cdll.LoadLibrary(lib_base)
 	
 	 
-	#arr = (ctypes.c_int * 20)(*range(20))
-	#print( solve_lib.Test( arr ) )
-	#print(arr)
-	#for v in arr:
-	#	print(v)
-
-	root = tk.Tk()
-	app = Sudoku(master=root)
-	app.mainloop()
+	Sudoku(master=tk.Tk()).mainloop()
 
 if __name__ == "__main__":
 	# execute only if run as a script
