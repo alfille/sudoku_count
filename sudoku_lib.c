@@ -158,6 +158,9 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 		// already set (preset from GUI)
 		//fprintf(stderr,"Set: Position %d,%d already set\n",testi,testj) ;
 		b = pattern[val] ;
+		if ( (b&pFS->mask_bits[testi][testj]) ) {
+			return NULL ;
+		}
 		// point mask
 		pFS->mask_bits[testi][testj] |= b ;
 	} else {
@@ -369,6 +372,7 @@ int Return_board( int * preset, struct FillState * pFS ) {
 	}
 }
 	
+// return 1=solved, 0 not. data in same array
 int Solve( int * preset ) {
 	struct FillState * pFS = Setup_board( preset ) ;
 	

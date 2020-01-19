@@ -5,14 +5,17 @@ import argparse
 import ctypes
 import platform
 
-class Sudoku(tk.Frame):
+class Persist:
 	SUBSIZE = 3
-	color=["dark gray","white"]
+
+
+class Sudoku(tk.Frame):
+	#color=["dark gray","white"]
+	color=["dark blue","yellow"]
 	
-	def __init__(self, master=None, subsize=3):
+	def __init__(self, master=None):
 		super().__init__(master)
-		self.SUBSIZE = subsize
-		self.SIZE = self.SUBSIZE * self.SUBSIZE
+		self.SIZE = Persist.SUBSIZE * Persist.SUBSIZE
 		self.TOTALSIZE = self.SIZE * self.SIZE
 		self.master = master
 		self.font = tkfont.Font(weight="bold",size=14)
@@ -25,8 +28,8 @@ class Sudoku(tk.Frame):
 	def set_win_sizes( self ):
 		self.tilex=self.but[0][0].winfo_width()
 		self.tiley=self.but[0][0].winfo_height()
-		self.popx = self.tilex*self.SUBSIZE
-		self.popy = self.tiley*self.SUBSIZE
+		self.popx = self.tilex*Persist.SUBSIZE
+		self.popy = self.tiley*Persist.SUBSIZE
 		self.winx = self.win.winfo_screenwidth()
 		self.winy = self.win.winfo_screenheight()
 		
@@ -38,6 +41,7 @@ class Sudoku(tk.Frame):
 	def sq_popup_done( self, i, j ):
 		self.pop.destroy()
 		self.but[i][j].configure(relief="raised")
+		self.status.configure(text="Edit mode")
 			
 	
 	def sq_popup( self,i,j):
@@ -56,20 +60,24 @@ class Sudoku(tk.Frame):
 			y = self.winy - self.popy
 		self.pop.geometry('+%d+%d' % (x,y) )
 		
-		for si in range(self.SUBSIZE):
-			for sj in range(self.SUBSIZE):
-				n = si*self.SUBSIZE+sj+1				
+		for si in range(Persist.SUBSIZE):
+			for sj in range(Persist.SUBSIZE):
+				n = si*Persist.SUBSIZE+sj+1				
 				tk.Button(self.pop,text=str(n),borderwidth=4,height=2,width=3,font=self.font,command=lambda i=i,j=j,n=str(n): self.set_square(i,j,n)).grid(row=si,column=sj)
-		tk.Button(self.pop,text="Clear",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j,n=" ": self.set_square(i,j,n)).grid(columnspan=self.SUBSIZE,sticky="EW")
-		tk.Button(self.pop,text="Back",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j: self.sq_popup_done(i,j)).grid(columnspan=self.SUBSIZE,sticky="EW")
+		tk.Button(self.pop,text="Clear",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j,n=" ": self.set_square(i,j,n)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
+		tk.Button(self.pop,text="Back",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j: self.sq_popup_done(i,j)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
 		self.pop.grab_set()
 
 	def clear(self):
+		self.status.configure(text="Clearing...")
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
 				self.but[i][j].configure(text=" ")
+		self.status.configure(text="Cleared")
 				
 	def solve(self):
+		self.status.configure(text="Solving...")
+		self.master.update()
 		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
 		k = 0
 		for i in range(self.SIZE):
@@ -81,7 +89,10 @@ class Sudoku(tk.Frame):
 					#print(i,j,k,arr[k])
 				#print("{} -> {}".format(k,arr[k]))
 				k += 1
-		solve_lib.Solve(arr)
+		if solve_lib.Solve(arr)==1:
+			self.status.configure(text="Successfully solved")
+		else:
+			self.status.configure(text="Not solvable")
 		k = 0
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
@@ -92,69 +103,98 @@ class Sudoku(tk.Frame):
 				k += 1
 	
 	def Quit(self):
-		self.master.destroy()
+		sys.exit()
+		self.master.quit()
 	
 	def create_widgets(self):
 		self.win = tk.Frame(self.master,borderwidth=2,relief="flat",background="white")
 		self.win.pack(side="top")
 		self.buttons=tk.Frame(self.master,borderwidth=2,relief="flat",background="white")
-		tk.Button(self.buttons,text="Solve",command=self.solve).pack(side="left")
-		tk.Button(self.buttons,text="Clear",command=self.clear).pack(side="left")
-		tk.Button(self.buttons,text="Exit",command=self.Quit).pack(side="left")
-		self.buttons.pack(side="bottom")
+		if Persist.SUBSIZE > 2:
+			tk.Label(self.buttons,text=" {0}x{0} ".format(self.SIZE),relief="sunken",anchor="c",font=self.font).pack(side="left",fill=tk.Y)
+		tk.Button(self.buttons,text="Solve",command=self.solve,font=self.font).pack(side="left")
+		tk.Button(self.buttons,text="Clear",command=self.clear,font=self.font).pack(side="left")
+		tk.Button(self.buttons,text="Exit",command=self.Quit,font=self.font).pack(side="left")
+		self.status = tk.Label(self.buttons,text="Edit mode",relief="sunken",anchor="e")
+		self.status.pack(side="left",fill="both",expand=1)
+		self.buttons.pack(side="bottom",fill=tk.X)
 	
 		self.but = [[0 for i in range(self.SIZE)] for j in range(self.SIZE)]
-		for si in range(self.SUBSIZE):
-			for sj in range(self.SUBSIZE):
-				f = tk.Frame(self.win,background=self.color[(si+sj)%2],borderwidth=2,relief="flat")
+		for si in range(Persist.SUBSIZE):
+			for sj in range(Persist.SUBSIZE):
+				f = tk.Frame(self.win,background=self.color[(si+sj)%2],borderwidth=3,relief="flat")
 				f.grid(row=si,column=sj)
-				for ssi in range(self.SUBSIZE):
-					for ssj in range(self.SUBSIZE):
-						i = si*self.SUBSIZE+ssi
-						j = sj*self.SUBSIZE+ssj
+				for ssi in range(Persist.SUBSIZE):
+					for ssj in range(Persist.SUBSIZE):
+						i = si*Persist.SUBSIZE+ssi
+						j = sj*Persist.SUBSIZE+ssj
 						self.but[i][j] = tk.Button(f,text=str(1+(i+j)%self.SIZE),borderwidth=4,height=2,width=3,font=self.font,command=lambda i=i,j=j: self.sq_popup(i,j))
 						self.but[i][j].grid(row=ssi, column=ssj)
-		#self.win = tk.Button(self)
-		#self.win["text"] = "Hello World\n(click me)"
-		#self.win["command"] = self.say_hi
-		#self.win.pack(side="top")
-
-		#self.quit = tk.Button(self, text="QUIT", fg="red",
-		#					  command=self.master.destroy)
-		#self.quit.pack(side="bottom")
 			
 	def about(self):
 		print("Sudoku Solve by Paul Alfille 2020")
+		
+	def Size(self) :
+		if ( self.ss_choose != Persist.SUBSIZE ):
+			Persist.SUBSIZE = self.ss_choose.get()
+			self.master.destroy()
 	
 	def create_menu(self):
 		self.menu = tk.Menu(self.master,tearoff=0)
+
+		self.filemenu = tk.Menu(self.menu,tearoff=0)
+		self.menu.add_cascade(label="File",menu=self.filemenu,font=self.font)
+		self.filemenu.add_command(label="Solve",command=self.solve,font=self.font)
+		self.filemenu.add_command(label="Clear",command=self.clear,font=self.font)
+		self.filemenu.add_command(label="Exit",command=self.Quit,font=self.font)
+
+		self.sizemenu = tk.Menu(self.menu,tearoff=0)
+		self.menu.add_cascade(label="Size",menu=self.sizemenu,font=self.font)
+		self.ss_choose = tk.IntVar()
+		ss_choose = Persist.SUBSIZE
+		for ss in range(2,7):
+			self.sizemenu.add_radiobutton(label=str(ss*ss)+"x"+str(ss*ss), value=ss, variable=self.ss_choose, command=self.Size,font=self.font)
+
 		self.helpmenu = tk.Menu(self.menu,tearoff=0)
-		self.menu.add_cascade(label="Help",menu=self.helpmenu)
-		self.helpmenu.add_command(label="About",command=self.about)
+		self.menu.add_cascade(label="Help",menu=self.helpmenu,font=self.font)
+		self.helpmenu.add_command(label="About",command=self.about,font=self.font)
+
 		self.master.config(menu=self.menu)
 
+def Libs():
+	# returns a dict
+	s_lib={}
+	
+	for ss in range(2,7):
+		# Shared C library
+		lib_base = "./" #location
+		lib_base += "sudoku_lib" # base name
+		
+		lib_base += str(ss*ss)	
+
+		# get the right filename
+		if platform.uname()[0] == "Windows":
+			lib_base += ".dll" 
+		if platform.uname()[0] == "Linux":
+			lib_base += ".so" 
+		else:
+			lib_base += ".dylib" 
+
+		# load library
+		global solve_lib
+		s_lib[ss] = ctypes.cdll.LoadLibrary(lib_base)
+	
+	return s_lib
+
 def main(args):
-
-	# Shared C library
-	lib_base = "./" #location
-	lib_base += "sudoku_lib" # base name
-	
-	lib_base += str(Sudoku.SUBSIZE*Sudoku.SUBSIZE)	
-
-	# get the right filename
-	if platform.uname()[0] == "Windows":
-		lib_base += ".dll" 
-	if platform.uname()[0] == "Linux":
-		lib_base += ".so" 
-	else:
-		lib_base += ".dylib" 
-
-	# load library
+	# set up library dist
 	global solve_lib
-	solve_lib = ctypes.cdll.LoadLibrary(lib_base)
-	
+	s_lib = Libs()
 	 
-	Sudoku(master=tk.Tk()).mainloop()
+	while True:
+		# load library
+		solve_lib = s_lib[Persist.SUBSIZE]
+		Sudoku(master=tk.Tk()).mainloop()
 
 if __name__ == "__main__":
 	# execute only if run as a script
