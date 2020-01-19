@@ -5,8 +5,10 @@ import argparse
 import ctypes
 import platform
 
-class Persist:
+class Persist(tk.Frame):
 	SUBSIZE = 3
+	X = False
+	Window = False
 
 
 class Sudoku(tk.Frame):
@@ -20,12 +22,19 @@ class Sudoku(tk.Frame):
 		self.master = master
 		self.font = tkfont.Font(weight="bold",size=14)
 		#self.pack()
+
+		self.X = tk.BooleanVar()
+		self.X.set(Persist.X)
+		self.Window = tk.BooleanVar()
+		self.Window.set(Persist.Window)
+
 		self.create_widgets()
 		self.create_menu()
 		self.win.update()
 		self.set_win_sizes()
 
 	def set_win_sizes( self ):
+		# needed for popup
 		self.tilex=self.but[0][0].winfo_width()
 		self.tiley=self.but[0][0].winfo_height()
 		self.popx = self.tilex*Persist.SUBSIZE
@@ -130,6 +139,14 @@ class Sudoku(tk.Frame):
 						j = sj*Persist.SUBSIZE+ssj
 						self.but[i][j] = tk.Button(f,text=str(1+(i+j)%self.SIZE),borderwidth=4,height=2,width=3,font=self.font,command=lambda i=i,j=j: self.sq_popup(i,j))
 						self.but[i][j].grid(row=ssi, column=ssj)
+						if Persist.X and ((i==j) or (i == self.SIZE-j-1)):
+							self.but[i][j].configure(background="light yellow")
+						if Persist.Window:
+							if (i % (Persist.SUBSIZE+1) > 0) and (j % (Persist.SUBSIZE+1) > 0):
+								self.but[i][j].configure(background="aquamarine")
+								if Persist.X and ((i==j) or (i == self.SIZE-j-1)):
+									self.but[i][j].configure(background="pale green")
+								
 			
 	def about(self):
 		print("Sudoku Solve by Paul Alfille 2020")
@@ -139,6 +156,15 @@ class Sudoku(tk.Frame):
 			Persist.SUBSIZE = self.ss_choose.get()
 			self.master.destroy()
 	
+	def Option(self):
+		if Persist.X != self.X.get():
+			Persist.X = self.X.get()
+			self.master.destroy()
+		if Persist.Window != self.Window.get():
+			Persist.Window = self.Window.get()
+			self.master.destroy()
+
+
 	def create_menu(self):
 		self.menu = tk.Menu(self.master,tearoff=0)
 
@@ -154,6 +180,11 @@ class Sudoku(tk.Frame):
 		ss_choose = Persist.SUBSIZE
 		for ss in range(2,7):
 			self.sizemenu.add_radiobutton(label=str(ss*ss)+"x"+str(ss*ss), value=ss, variable=self.ss_choose, command=self.Size,font=self.font)
+
+		self.optmenu = tk.Menu(self.menu,tearoff=0)
+		self.menu.add_cascade(label="Options",menu=self.optmenu,font=self.font)
+		self.optmenu.add_checkbutton(label="X pattern",onvalue=True,offvalue=False,variable=self.X,font=self.font,command=self.Option)
+		self.optmenu.add_checkbutton(label="Window pane",onvalue=True,offvalue=False,variable=self.Window,font=self.font,command=self.Option)
 
 		self.helpmenu = tk.Menu(self.menu,tearoff=0)
 		self.menu.add_cascade(label="Help",menu=self.helpmenu,font=self.font)
