@@ -98,7 +98,15 @@ class Sudoku(tk.Frame):
 					#print(i,j,k,arr[k])
 				#print("{} -> {}".format(k,arr[k]))
 				k += 1
-		if solve_lib.Solve(arr)==1:
+		if Persist.X:
+			x=1
+		else:
+			x=0
+		if Persist.Window:
+			w=1
+		else:
+			w=0
+		if solve_lib.Solve(x,w,arr)==1:
 			self.status.configure(text="Successfully solved")
 		else:
 			self.status.configure(text="Not solvable")

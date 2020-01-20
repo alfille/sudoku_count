@@ -29,6 +29,11 @@
 #define VAL2FREE( v ) ( -((v)+1) )
 #define FREE2VAL( f ) ( -((f)+1) )
 
+// Special
+int Xpattern ;
+int Wpattern ;
+
+
 
 // bit pattern
 int pattern[SIZE] ;
@@ -183,6 +188,7 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 		
 		// Push state (with current choice masked out) if more than one choice
 		if ( pFS->free_state[testi][testj] > 0 ) {
+			printf("Push");
 			pFS = StateStackPush() ;
 		}
 		// Now set this choice
@@ -229,7 +235,6 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 		--pFS->free_state[k][testj] ;
 	}
 
-
 	// subsquare
 	for( si=0 ; si<SUBSIZE ; ++si ) {
 		for( sj=0 ; sj<SUBSIZE ; ++sj ) {
@@ -252,6 +257,74 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 			--pFS->free_state[i][j] ;
 		}
 	}
+	
+	// Xpattern
+	if ( Xpattern ) {
+		if ( testi==testj ) {
+			for ( k=0 ; k<SIZE ; ++k ) {
+				if ( pFS->free_state[k][k] < 0 ) {
+					// assigned
+					continue ;
+				}
+				if ( pFS->mask_bits[k][k] & b ) {
+					// already masked
+					continue ;
+				}
+				if ( pFS->free_state[k][k] == 1 ) {
+					// nothing left
+					return NULL ;
+				}
+				pFS->mask_bits[k][k] |= b ;
+				--pFS->free_state[k][k] ;
+			}
+		} else if ( testi==SIZE-1-testj ) {
+			for ( k=0 ; k<SIZE ; ++k ) {
+				int l = SIZE - 1 - k ;
+				if ( pFS->free_state[k][l] < 0 ) {
+					// assigned
+					continue ;
+				}
+				if ( pFS->mask_bits[k][l] & b ) {
+					// already masked
+					continue ;
+				}
+				if ( pFS->free_state[k][l] == 1 ) {
+					// nothing left
+					return NULL ;
+				}
+				pFS->mask_bits[k][l] |= b ;
+				--pFS->free_state[k][l] ;
+			}
+		}
+	}
+
+	// Window Pane
+	if ( Wpattern ) {
+		if ( (testi%(SUBSIZE+1))!=0 && (testj%(SUBSIZE+1))!=0 ) {
+			for( si=0 ; si<SUBSIZE ; ++si ) {
+				int i = (testi / (SUBSIZE+1)) * (SUBSIZE+1) + 1 + si ;
+				for( sj=0 ; sj<SUBSIZE ; ++sj ) {
+					int j = (testj / (SUBSIZE+1)) * (SUBSIZE+1) + 1 + sj ;
+					// row
+					if ( pFS->free_state[i][j] < 0 ) {
+						// assigned
+						continue ;
+					}
+					if ( pFS->mask_bits[i][j] & b ) {
+						// already masked
+						continue ;
+					}
+					if ( pFS->free_state[i][j] == 1 ) {
+						// nothing left
+						return NULL ;
+					}
+					pFS->mask_bits[i][j] |= b ;
+					--pFS->free_state[i][j] ;
+				}
+			}
+		}
+	}
+	
 	return pFS ;
 }
 		
@@ -275,10 +348,12 @@ struct FillState * Next_move( struct FillState * pFS, int * done ) {
 				continue ;		
 			}
 			if ( free_state == 0 ) {
+				printf("0");
 				//printf("Slot %d,%d exhausted\n",i,j);
 				return NULL ;
 			}
 			if ( free_state == 1 ) {
+				printf("1");
 				//printf("Slot %d,%d exactly specified\n",i,j);
 				return Set_Square( pFS, i, j ) ;
 			}
@@ -299,6 +374,7 @@ struct FillState * Next_move( struct FillState * pFS, int * done ) {
 	
 	// Try smallest choice (most constrained)
 	//printf("Slot %d,%d will be probed (free %d)\n",fi,fj,minfree);
+	printf("%d",minfree);
 	return Set_Square( pFS, fi, fj ) ;
 }
 
@@ -309,6 +385,7 @@ struct FillState * SolveLoop( struct FillState * pFS ) {
 		//printf("Solveloop\n");
 		pFS = Next_move( pFS , &done ) ;
 		if ( pFS == NULL ) {
+			printf("Pop");
 			pFS = StateStackPop() ;
 		}
 		if ( pFS == NULL ) {
@@ -359,6 +436,7 @@ int Return_board( int * preset, struct FillState * pFS ) {
 	
 	if ( pFS ) {
 		// solved
+		printf(" :)\n");
 		for ( i=0 ; i<SIZE ; ++i ) {
 			for ( j=0 ; j<SIZE ; ++j ) {
 				set[0] = FREE2VAL( pFS->free_state[i][j] ) ;
@@ -367,14 +445,19 @@ int Return_board( int * preset, struct FillState * pFS ) {
 		}
 		return 1 ;
 	} else {
+		printf(" :(\n");
 		// unsolvable
 		return 0 ;
 	}
 }
 	
 // return 1=solved, 0 not. data in same array
-int Solve( int * preset ) {
+int Solve( int X, int Window, int * preset ) {
 	struct FillState * pFS = Setup_board( preset ) ;
+	
+	Xpattern = X ;
+	Wpattern = Window ;
+	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
 	
 	if ( pFS ) {
 		return Return_board( preset, SolveLoop( pFS ) ) ;
