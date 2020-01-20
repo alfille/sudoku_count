@@ -4,6 +4,11 @@ import tkinter.font as tkfont
 import argparse
 import ctypes
 import platform
+import signal
+
+def signal_handler(signal, frame):
+    print("\nForced end\n")
+    sys.exit(0)
 
 class Persist(tk.Frame):
 	SUBSIZE = 3
@@ -226,6 +231,9 @@ def Libs():
 	return s_lib
 
 def main(args):
+	# keyboard interrupt
+	signal.signal(signal.SIGINT, signal_handler)
+
 	# set up library dist
 	global solve_lib
 	s_lib = Libs()

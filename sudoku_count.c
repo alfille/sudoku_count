@@ -265,13 +265,13 @@ int Type_fill_square( void ) {
 
 void TypeLoopPrint( uint64_t count, uint64_t candidate, uint64_t good ) {
     if ( !quiet ) {
-        printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%g.2\t%.6f%%\t%.6f%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
+        printf("Bad=%"PRIu64", Candidate=%"PRIu64", Good=%"PRIu64"\tper second=%6.2g\t%6.3f%%\t%6.3f%%\n",count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
 }   }
 
 void TypeLoopSummary( uint64_t count, uint64_t candidate, uint64_t good ) {
     if ( fsummary ) {
         fprintf(fsummary,"Type,Bad,Candidate,Good,perSec,Cand%%,Good%%\n") ;
-        fprintf(fsummary,"%s%s,%"PRIu64",%"PRIu64",%"PRIu64",%g.2,%.6f%%,%.6f%%\n",key,statestack.back,count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
+        fprintf(fsummary,"%s%s,%"PRIu64",%"PRIu64",%"PRIu64",%6.1g,%6.3f%%,%6.3f%%\n",key,statestack.back,count-good-candidate,candidate,good,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*candidate)/count,(100.*good)/count) ;
 }   }
 
 int constraints[SIZE][SIZE] ;
@@ -769,13 +769,13 @@ int X_fill_square( void ) {
 
 void SSLoopPrint( uint64_t count, uint64_t good, uint64_t totalcount ) {
     if ( !quiet ) {
-        printf("count=%"PRIu64", Good=%"PRIu64"\taverage=%g.1\tper second=%.1f\t%.6f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+        printf("count=%"PRIu64", Good=%"PRIu64"\taverage=%6.3g\tper second=%6.1f\t%6.3f%%\n",count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
 }   }
 
 void SSLoopSummary( uint64_t count, uint64_t good, uint64_t totalcount ) {
     if ( fsummary ) {
         fprintf(fsummary,"Type,Count,Good,Average,perSec,Success%%\n") ;
-        fprintf(fsummary,"%s%s,%"PRIu64",%"PRIu64",%g.1,%.1f,%.6f%%\n",key,statestack.back,count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
+        fprintf(fsummary,"%s%s,%"PRIu64",%"PRIu64",%6.3g,%6.1f,%6.3f%%\n",key,statestack.back,count,good,(double)totalcount/count,(double)(CLOCKS_PER_SEC*count)/(clock()-start),(100.*good)/count) ;
 }   }
 
 void SSLoop( int (*fill)(void) ) {
