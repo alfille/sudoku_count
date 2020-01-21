@@ -16,6 +16,9 @@
 #include <signal.h>
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
+#include <signal.h>
+
+clock_t next_clock ;
 
 // SIZE x SIZE sudoku board
 #ifndef SUBSIZE
@@ -29,11 +32,13 @@
 #define VAL2FREE( v ) ( -((v)+1) )
 #define FREE2VAL( f ) ( -((f)+1) )
 
+void RuptHandler( int sig ) {
+	exit(1);
+}
+
 // Special
 int Xpattern ;
 int Wpattern ;
-
-
 
 // bit pattern
 int pattern[SIZE] ;
@@ -67,6 +72,8 @@ int reverse_pattern( int pat ) {
 struct FillState {
     int mask_bits[SIZE][SIZE] ;
     int free_state[SIZE][SIZE] ;
+    int * preset ;
+    int done ;
 } State[MAXTRACK] ;
 
 struct StateStack {
@@ -75,7 +82,7 @@ struct StateStack {
     int end ;
 } statestack = { 0,0,0 };
 
-struct FillState * StateStackInit ( void ) {
+struct FillState * StateStackInit ( int * preset ) {
 	int i,j ;
     statestack.size = TOTALSIZE ;
     statestack.start = statestack.end = 0 ;
@@ -85,6 +92,9 @@ struct FillState * StateStackInit ( void ) {
 			State[0].free_state[i][j] = SIZE ;
 		}
 	}
+	State[0].done = 0 ;
+	State[0].preset = preset ;
+	
     return & State[0] ;
 }
 
@@ -330,14 +340,12 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 		
 
 
-struct FillState * Next_move( struct FillState * pFS, int * done ) {
+struct FillState * Next_move( struct FillState * pFS ) {
 	int i ;
 	int j ;
 	int minfree = SIZE + 1 ;
 	int fi, fj ;
-	
-	done[0] = 0 ; //assume not done
-	
+		
     //print_square( pFS ) ;
     for ( i=0 ; i < SIZE ; ++i ) {
 		for ( j=0 ; j< SIZE ; ++j ) {
@@ -367,8 +375,7 @@ struct FillState * Next_move( struct FillState * pFS, int * done ) {
 	}
 	if ( minfree == SIZE+1 ) {
 		// only set squares -- Victory
-		// only set squares -- Victory
-		done[0] = 1 ; // all done
+		pFS->done = 1 ; // all done
 		return pFS ;
 	}
 	
@@ -378,18 +385,18 @@ struct FillState * Next_move( struct FillState * pFS, int * done ) {
 	return Set_Square( pFS, fi, fj ) ;
 }
 
-struct FillState * SolveLoop( struct FillState * pFS ) {
-	int done = 0 ;
-	
-	while ( done == 0 ) {
-		//printf("Solveloop\n");
-		pFS = Next_move( pFS , &done ) ;
-		if ( pFS == NULL ) {
-			printf("Pop");
-			pFS = StateStackPop() ;
-		}
-		if ( pFS == NULL ) {
-			return NULL ;
+struct FillState * SolveLoop( struct FillState * pFS ) {	
+	if ( pFS ) {
+		while ( pFS->done == 0 ) {
+			//printf("Solveloop\n");
+			pFS = Next_move( pFS ) ;
+			if ( pFS == NULL ) {
+				printf("Pop");
+				pFS = StateStackPop() ;
+			}
+			if ( pFS == NULL ) {
+				return NULL ;
+			}
 		}
 	}
 	//print_square( pFS ) ;
@@ -407,7 +414,7 @@ struct FillState * Setup_board( int * preset ) {
 	
 	int i, j ;
 	int * set = preset ; // pointer though preset array
-	struct FillState * pFS = StateStackInit( ) ;
+	struct FillState * pFS = StateStackInit( preset ) ;
 	
 	//printf("LIB\n") ;
 	make_pattern() ; // set up bit pattern list
@@ -430,13 +437,14 @@ struct FillState * Setup_board( int * preset ) {
 	return pFS ;
 }
 
-int Return_board( int * preset, struct FillState * pFS ) {
+int Return_board( struct FillState * pFS ) {
 	int i, j ;
-	int * set = preset ; // pointer though preset array
+	int * set ; // pointer though preset array
 	
 	if ( pFS ) {
 		// solved
 		printf(" :)\n");
+		set = pFS->preset ;
 		for ( i=0 ; i<SIZE ; ++i ) {
 			for ( j=0 ; j<SIZE ; ++j ) {
 				set[0] = FREE2VAL( pFS->free_state[i][j] ) ;
@@ -455,15 +463,19 @@ int Return_board( int * preset, struct FillState * pFS ) {
 int Solve( int X, int Window, int * preset ) {
 	struct FillState * pFS = Setup_board( preset ) ;
 	
+	signal( SIGINT, RuptHandler ) ;
+
+	next_clock = clock() + 60 * CLOCKS_PER_SEC ;
+	
 	Xpattern = X ;
 	Wpattern = Window ;
 	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
 	
 	if ( pFS ) {
-		return Return_board( preset, SolveLoop( pFS ) ) ;
+		return Return_board( SolveLoop( pFS ) ) ;
 	} else {
 		// bad input (inconsistent soduku)
-		return Return_board( preset, NULL ) ;
+		return Return_board( NULL ) ;
 	}
 }
 	

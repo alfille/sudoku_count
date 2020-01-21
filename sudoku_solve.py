@@ -17,8 +17,8 @@ class Persist(tk.Frame):
 
 
 class Sudoku(tk.Frame):
-	#color=["dark gray","white"]
 	color=["dark blue","yellow"]
+	solution = False
 	
 	def __init__(self, master=None):
 		super().__init__(master)
@@ -47,10 +47,19 @@ class Sudoku(tk.Frame):
 		self.winx = self.win.winfo_screenwidth()
 		self.winy = self.win.winfo_screenheight()
 		
-	
+	def	UnRed( self ):
+		if self.solution:
+			# need to clear old solution
+			for i in range(self.SIZE):
+				for j in range(self.SIZE):
+					self.but[i][j].configure(fg="black")
+			self.solution = False
+
+
 	def set_square(self,i,j,n):
 		self.but[i][j].configure(text=n)
 		self.sq_popup_done( i , j )
+		self.UnRed()
 		
 	def sq_popup_done( self, i, j ):
 		self.pop.destroy()
@@ -88,18 +97,21 @@ class Sudoku(tk.Frame):
 			for j in range(self.SIZE):
 				self.but[i][j].configure(text=" ")
 		self.status.configure(text="Cleared")
+		self.UnRed()
 				
 	def solve(self):
 		self.status.configure(text="Solving...")
 		self.master.update()
 		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
 		k = 0
+		self.solution = True
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
 				arr[k] = -1 # default blank
 				t = self.but[i][j].cget('text')
 				if t != " ":
 					arr[k] = int(t)-1 # 0-based values for squares
+					self.but[i][j].configure(fg="red")
 					#print(i,j,k,arr[k])
 				#print("{} -> {}".format(k,arr[k]))
 				k += 1
