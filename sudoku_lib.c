@@ -18,7 +18,7 @@
 #include <inttypes.h>
 #include <signal.h>
 
-clock_t next_clock ;
+time_t next_time ;
 
 // SIZE x SIZE sudoku board
 #ifndef SUBSIZE
@@ -37,12 +37,14 @@ void RuptHandler( int sig ) {
 }
 
 // Special
-int Xpattern ;
-int Wpattern ;
+static int Xpattern ;
+static int Wpattern ;
+static int Debug ;
+static int ReDoCount ;
 
 // bit pattern
-int pattern[SIZE] ;
-int full_pattern ;
+static int pattern[SIZE] ;
+static int full_pattern ;
 
 // Make numbers int bit pattern (1=0x1 2=0x2 3=0x4...)
 void make_pattern(void) {
@@ -75,6 +77,8 @@ struct FillState {
     int * preset ;
     int done ;
 } State[MAXTRACK] ;
+
+static struct FillState * pFS_interrupted = NULL ;
 
 struct StateStack {
     int size ;
@@ -198,7 +202,9 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 		
 		// Push state (with current choice masked out) if more than one choice
 		if ( pFS->free_state[testi][testj] > 0 ) {
-			printf("Push");
+			if ( Debug ) {
+				printf("Push");
+			}
 			pFS = StateStackPush() ;
 		}
 		// Now set this choice
@@ -356,12 +362,16 @@ struct FillState * Next_move( struct FillState * pFS ) {
 				continue ;		
 			}
 			if ( free_state == 0 ) {
-				printf("0");
+				if ( Debug ) {
+					printf("0");
+				}
 				//printf("Slot %d,%d exhausted\n",i,j);
 				return NULL ;
 			}
 			if ( free_state == 1 ) {
-				printf("1");
+				if ( Debug ) {
+					printf("1");
+				}
 				//printf("Slot %d,%d exactly specified\n",i,j);
 				return Set_Square( pFS, i, j ) ;
 			}
@@ -381,29 +391,31 @@ struct FillState * Next_move( struct FillState * pFS ) {
 	
 	// Try smallest choice (most constrained)
 	//printf("Slot %d,%d will be probed (free %d)\n",fi,fj,minfree);
-	printf("%d",minfree);
+	if ( Debug ) {
+		printf("%d",minfree);
+	}
 	return Set_Square( pFS, fi, fj ) ;
 }
 
 struct FillState * SolveLoop( struct FillState * pFS ) {	
-	if ( pFS ) {
-		while ( pFS->done == 0 ) {
-			//printf("Solveloop\n");
-			pFS = Next_move( pFS ) ;
-			if ( pFS == NULL ) {
+	time_t next = time(NULL) + 6 ; // every minute +
+	while ( pFS && pFS->done == 0 ) {
+		//printf("Solveloop\n");
+		pFS = Next_move( pFS ) ;
+		if ( pFS == NULL ) {
+			if ( Debug ) {
 				printf("Pop");
-				pFS = StateStackPop() ;
 			}
-			if ( pFS == NULL ) {
-				return NULL ;
+			pFS = StateStackPop() ;
+			if ( next < time(NULL) ) {
+				// Interrupt for time -- can resume
+				return pFS ;
 			}
 		}
 	}
 	//print_square( pFS ) ;
 	return pFS ;
 }
-
-
 
 struct FillState * Setup_board( int * preset ) {
 	// preset is an array of TOTALSIZE length
@@ -434,41 +446,77 @@ struct FillState * Setup_board( int * preset ) {
 			++set ; // move to next entry
 		}
 	}
+	//printf("PostLIB\n") ;
 	return pFS ;
 }
 
 int Return_board( struct FillState * pFS ) {
-	int i, j ;
-	int * set ; // pointer though preset array
-	
 	if ( pFS ) {
+		int i, j ;
+		int * set ; // pointer though preset array
 		// solved
-		printf(" :)\n");
+		//printf("Return\n");
 		set = pFS->preset ;
 		for ( i=0 ; i<SIZE ; ++i ) {
 			for ( j=0 ; j<SIZE ; ++j ) {
-				set[0] = FREE2VAL( pFS->free_state[i][j] ) ;
+				int val = FREE2VAL( pFS->free_state[i][j] ) ; 
+				//printf("(%d)",val ) ;
+				set[0] = val >= 0 ? val : -1 ;
 				++set ; // move to next entry
 			}
 		}
-		return 1 ;
+		if ( pFS->done ) {
+			// solved
+			if ( Debug ) {
+				printf(" :)\n");
+			}
+			pFS_interrupted = NULL ;
+			return 1 ;
+		} else {
+			// interrupted -- want to resume
+			if ( Debug ) {
+				printf(" :0\n");
+			}
+			pFS_interrupted = pFS ;
+			return --ReDoCount ;
+		}
 	} else {
-		printf(" :(\n");
+		if (Debug) {
+			printf(" :(\n");
+		}
 		// unsolvable
 		return 0 ;
 	}
 }
 	
+int Resume( void ) {
+
+	// resume processing -- all data alreay statically set by prior call to Solve
+	struct FillState * pFS = pFS_interrupted ;
+	
+	pFS_interrupted = NULL ; // clear prior
+
+	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
+	if ( pFS ) {
+		return Return_board( SolveLoop( pFS ) ) ;
+	} else {
+		// bad input (inconsistent soduku)
+		return Return_board( NULL ) ;
+	}
+}
+	
 // return 1=solved, 0 not. data in same array
-int Solve( int X, int Window, int * preset ) {
+int Solve( int X, int Window, int debug, int * preset ) {
 	struct FillState * pFS = Setup_board( preset ) ;
 	
 	signal( SIGINT, RuptHandler ) ;
+	pFS_interrupted = NULL ;
 
-	next_clock = clock() + 60 * CLOCKS_PER_SEC ;
-	
 	Xpattern = X ;
 	Wpattern = Window ;
+	Debug = debug ;
+	ReDoCount = 0 ;
+	
 	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
 	
 	if ( pFS ) {

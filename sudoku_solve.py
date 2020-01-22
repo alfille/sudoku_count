@@ -14,6 +14,8 @@ class Persist(tk.Frame):
 	SUBSIZE = 3
 	X = False
 	Window = False
+	Debug = False
+	Fsize = 14
 
 
 class Sudoku(tk.Frame):
@@ -25,13 +27,15 @@ class Sudoku(tk.Frame):
 		self.SIZE = Persist.SUBSIZE * Persist.SUBSIZE
 		self.TOTALSIZE = self.SIZE * self.SIZE
 		self.master = master
-		self.font = tkfont.Font(weight="bold",size=14)
+		self.font = tkfont.Font(weight="bold",size=Persist.Fsize)
 		#self.pack()
 
 		self.X = tk.BooleanVar()
 		self.X.set(Persist.X)
 		self.Window = tk.BooleanVar()
 		self.Window.set(Persist.Window)
+		self.Debug = tk.BooleanVar()
+		self.Debug.set(Persist.Debug)
 
 		self.create_widgets()
 		self.create_menu()
@@ -115,26 +119,50 @@ class Sudoku(tk.Frame):
 					#print(i,j,k,arr[k])
 				#print("{} -> {}".format(k,arr[k]))
 				k += 1
-		if Persist.X:
-			x=1
-		else:
-			x=0
-		if Persist.Window:
-			w=1
-		else:
-			w=0
-		if solve_lib.Solve(x,w,arr)==1:
-			self.status.configure(text="Successfully solved")
-		else:
-			self.status.configure(text="Not solvable")
-		k = 0
-		for i in range(self.SIZE):
-			for j in range(self.SIZE):
-				if arr[k] >= 0 :
-					self.but[i][j].configure(text=str(arr[k]+1)) # 1-based text values
-				else:
-					self.but[i][j].configure(text=" ")
-				k += 1
+
+		x = 1 if Persist.X else 0
+		w = 1 if Persist.Window else 0
+		d = 1 if Persist.Debug else 0
+
+		sol = solve_lib.Solve(x,w,d,arr)
+		while True:
+			if sol == 0:
+				self.status.configure(text="Not solvable")
+				for i in range(self.SIZE):
+					for j in range(self.SIZE):
+						if self.but[i][j].cget('fg') != 'red':
+							self.but[i][j].configure(text=" ")
+				self.master.update()
+				break
+			if sol == 1:
+				self.status.configure(text="Successfully solved")
+				k = 0
+				for i in range(self.SIZE):
+					for j in range(self.SIZE):
+						if arr[k] >= 0 :
+							self.but[i][j].configure(text=str(arr[k]+1)) # 1-based text values
+							if self.but[i][j].cget('fg') == 'blue':
+								self.but[i][j].configure(fg='black')
+						else:
+							self.but[i][j].configure(text=" ")
+						k += 1
+				self.master.update()
+				break
+			if sol < 0:
+				print(sol)
+				self.status.configure(text="<"+str(-sol)+">  Still solving...")
+				k = 0
+				for i in range(self.SIZE):
+					for j in range(self.SIZE):
+						if self.but[i][j].cget('fg') != 'red':
+							self.but[i][j].configure(fg='blue')
+						if arr[k] >= 0 :
+							self.but[i][j].configure(text=str(arr[k]+1)) # 1-based text values
+						else:
+							self.but[i][j].configure(text=" ")
+						k += 1
+			self.master.update()
+			sol = solve_lib.Resume()
 	
 	def Quit(self):
 		sys.exit()
@@ -156,13 +184,14 @@ class Sudoku(tk.Frame):
 		self.but = [[0 for i in range(self.SIZE)] for j in range(self.SIZE)]
 		for si in range(Persist.SUBSIZE):
 			for sj in range(Persist.SUBSIZE):
-				f = tk.Frame(self.win,background=self.color[(si+sj)%2],borderwidth=3,relief="flat")
+				f = tk.Frame(self.win,background=self.color[(si+sj)%2],borderwidth=2,relief="flat")
+				f = tk.Frame(self.win,background=self.color[(si+sj)%2],borderwidth=2,relief="flat")
 				f.grid(row=si,column=sj)
 				for ssi in range(Persist.SUBSIZE):
 					for ssj in range(Persist.SUBSIZE):
 						i = si*Persist.SUBSIZE+ssi
 						j = sj*Persist.SUBSIZE+ssj
-						self.but[i][j] = tk.Button(f,text=str(1+(i+j)%self.SIZE),borderwidth=4,height=2,width=3,font=self.font,command=lambda i=i,j=j: self.sq_popup(i,j))
+						self.but[i][j] = tk.Button(f,text=str(1+(i+j)%self.SIZE),borderwidth=3,height=1,width=2,font=self.font,command=lambda i=i,j=j: self.sq_popup(i,j))
 						self.but[i][j].grid(row=ssi, column=ssj)
 						if Persist.X and ((i==j) or (i == self.SIZE-j-1)):
 							self.but[i][j].configure(background="light yellow")
@@ -188,7 +217,12 @@ class Sudoku(tk.Frame):
 		if Persist.Window != self.Window.get():
 			Persist.Window = self.Window.get()
 			self.master.destroy()
+		Persist.Debug = self.Debug.get()
 
+	def fsize( self, f ):
+		if ( f != Persist.Fsize ) :
+			Persist.Fsize = f
+			self.master.destroy()
 
 	def create_menu(self):
 		self.menu = tk.Menu(self.master,tearoff=0)
@@ -210,6 +244,11 @@ class Sudoku(tk.Frame):
 		self.menu.add_cascade(label="Options",menu=self.optmenu,font=self.font)
 		self.optmenu.add_checkbutton(label="X pattern",onvalue=True,offvalue=False,variable=self.X,font=self.font,command=self.Option)
 		self.optmenu.add_checkbutton(label="Window pane",onvalue=True,offvalue=False,variable=self.Window,font=self.font,command=self.Option)
+		self.optmenu.add_checkbutton(label="Debugging data",onvalue=True,offvalue=False,variable=self.Debug,font=self.font,command=self.Option)
+		self.fontmenu = tk.Menu(self.optmenu,tearoff=0)
+		self.optmenu.add_cascade(label="Font size",menu=self.fontmenu,font=self.font)
+		for ff in [6,8,10,14,18,22,26]:
+			self.fontmenu.add_command(label=str(ff), font=self.font, command=lambda ff=ff: self.fsize(ff))
 
 		self.helpmenu = tk.Menu(self.menu,tearoff=0)
 		self.menu.add_cascade(label="Help",menu=self.helpmenu,font=self.font)
