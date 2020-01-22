@@ -149,7 +149,6 @@ class Sudoku(tk.Frame):
 				self.master.update()
 				break
 			if sol < 0:
-				print(sol)
 				self.status.configure(text="<"+str(-sol)+">  Still solving...")
 				k = 0
 				for i in range(self.SIZE):
@@ -191,7 +190,7 @@ class Sudoku(tk.Frame):
 					for ssj in range(Persist.SUBSIZE):
 						i = si*Persist.SUBSIZE+ssi
 						j = sj*Persist.SUBSIZE+ssj
-						self.but[i][j] = tk.Button(f,text=str(1+(i+j)%self.SIZE),borderwidth=3,height=1,width=2,font=self.font,command=lambda i=i,j=j: self.sq_popup(i,j))
+						self.but[i][j] = tk.Button(f,text=str(1+(i+j)%self.SIZE),borderwidth=3,height=1,width=1,font=self.font,command=lambda i=i,j=j: self.sq_popup(i,j))
 						self.but[i][j].grid(row=ssi, column=ssj)
 						if Persist.X and ((i==j) or (i == self.SIZE-j-1)):
 							self.but[i][j].configure(background="light yellow")
