@@ -15,19 +15,34 @@ OBJMC = most_connected.o
 	$(CC) -fPIC -shared -o $@ $< $(CFLAGS)
 
 sudoku_lib4.so: sudoku_lib.c $(DEPS)
-	$(CC) -fPIC -DSUBSIZE=2 -shared -o $@ sudoku_lib.c $(CFLAGS)
+	$(CC) -fPIC -DSUBSIZE=2 -shared -o $@ $< $(CFLAGS)
 
 sudoku_lib9.so: sudoku_lib.c $(DEPS)
-	$(CC) -fPIC -DSUBSIZE=3 -shared -o $@ sudoku_lib.c $(CFLAGS)
+	$(CC) -fPIC -DSUBSIZE=3 -shared -o $@ $< $(CFLAGS)
 
 sudoku_lib16.so: sudoku_lib.c $(DEPS)
-	$(CC) -fPIC -DSUBSIZE=4 -shared -o $@ sudoku_lib.c $(CFLAGS)
+	$(CC) -fPIC -DSUBSIZE=4 -shared -o $@ $< $(CFLAGS)
 
 sudoku_lib25.so: sudoku_lib.c $(DEPS)
-	$(CC) -fPIC -DSUBSIZE=5 -shared -o $@ sudoku_lib.c $(CFLAGS)
+	$(CC) -fPIC -DSUBSIZE=5 -shared -o $@ $< $(CFLAGS)
 
 sudoku_lib36.so: sudoku_lib.c $(DEPS)
-	$(CC) -fPIC -DSUBSIZE=6 -shared -o $@ sudoku_lib.c $(CFLAGS)
+	$(CC) -fPIC -DSUBSIZE=6 -shared -o $@ $< $(CFLAGS)
+
+sudoku2_lib4.so: sudoku2_lib.c $(DEPS)
+	$(CC) -fPIC -DSUBSIZE=2 -shared -o $@ $< $(CFLAGS)
+
+sudoku2_lib9.so: sudoku2_lib.c $(DEPS)
+	$(CC) -fPIC -DSUBSIZE=3 -shared -o $@ $< $(CFLAGS)
+
+sudoku2_lib16.so: sudoku2_lib.c $(DEPS)
+	$(CC) -fPIC -DSUBSIZE=4 -shared -o $@ $< $(CFLAGS)
+
+sudoku2_lib25.so: sudoku2_lib.c $(DEPS)
+	$(CC) -fPIC -DSUBSIZE=5 -shared -o $@ $< $(CFLAGS)
+
+sudoku2_lib36.so: sudoku2_lib.c $(DEPS)
+	$(CC) -fPIC -DSUBSIZE=6 -shared -o $@ $< $(CFLAGS)
 
 sudoku_count: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS)
@@ -55,4 +70,5 @@ most_connected: $(OBJMC)
 
 all: sudoku_count sudoku_count36 sudoku_count25 sudoku_count16 sudoku_count9 sudoku_count4 \
   least_connected most_connected \
-  sudoku_lib.so sudoku_lib36.so sudoku_lib25.so sudoku_lib16.so sudoku_lib9.so sudoku_lib4.so
+  sudoku_lib36.so sudoku_lib25.so sudoku_lib16.so sudoku_lib9.so sudoku_lib4.so \
+  sudoku2_lib36.so sudoku2_lib25.so sudoku2_lib16.so sudoku2_lib9.so sudoku2_lib4.so
