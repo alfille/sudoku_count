@@ -325,6 +325,7 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 	int si, sj, k ;
 	int val = FREE2VAL( pFS->free_state[testi][testj] );
 	int b ;
+	static int offset = 0 ;
 	//char debug ;
 	//printf("Set %d %d bit=%X mask=%X\n",testi,testj,pFS->free_state[testi][testj],pFS->mask_bits[testi][testj]);
 	//debug = getchar() ;
@@ -345,7 +346,8 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 		int v ;
 		for ( v = 0 ; v < SIZE ; ++v ) {
 			// Start fram a more varied number
-			val = (testi+testj+v) % SIZE ;
+//			val = (testi+testj+v) % SIZE ;
+			val = (offset+v) % SIZE ;
 			b = pattern[val] ;
 			//printf("val=%d b=%X mask=%X b&mask=%X\n",val,b,mask,b&mask ) ;
 			if ( (b & mask) == 0 ) {
@@ -354,7 +356,8 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 			}
 		}
 		// should never fall though
-
+		++offset ;
+		
 		// point
 		pFS->mask_bits[testi][testj] |= b ;
 		--pFS->free_state[testi][testj] ;
