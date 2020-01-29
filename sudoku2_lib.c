@@ -149,7 +149,7 @@ int CheckSS( int i, int j, struct FillState * pFS ) {
 			}
 		}
 	}
-	printf("UnavailableSS\n");
+	//printf("UnavailableSS\n");
 	return 1 ;
 }
 
@@ -170,7 +170,7 @@ int CheckR( int i, struct FillState * pFS ) {
 			return 0;
 		}
 	}
-	printf("UnavailableR\n");
+	//printf("UnavailableR\n");
 	return 1 ;
 }
 
@@ -191,7 +191,7 @@ int CheckC( int j, struct FillState * pFS ) {
 			return 0;
 		}
 	}
-	printf("UnavailableC\n");
+	//printf("UnavailableC\n");
 	return 1 ;
 }
 
@@ -212,7 +212,7 @@ int CheckD1( struct FillState * pFS ) {
 			return 0;
 		}
 	}
-	printf("UnavailableD1\n");
+	//printf("UnavailableD1\n");
 	return 1 ;
 }
 
@@ -234,7 +234,7 @@ int CheckD2( struct FillState * pFS ) {
 			return 0;
 		}
 	}
-	printf("UnavailableD2\n");
+	//printf("UnavailableD2\n");
 	return 1 ;
 }
 
@@ -342,7 +342,10 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 		// Not already set (Part of solve search)
 		// find clear bit
 		int mask = pFS->mask_bits[testi][testj] ;
-		for ( val = 0 ; val < SIZE ; ++val ) {
+		int v ;
+		for ( v = 0 ; v < SIZE ; ++v ) {
+			// Start fram a more varied number
+			val = (testi+testj+v) % SIZE ;
 			b = pattern[val] ;
 			//printf("val=%d b=%X mask=%X b&mask=%X\n",val,b,mask,b&mask ) ;
 			if ( (b & mask) == 0 ) {
@@ -674,7 +677,7 @@ int Solve( int X, int Window, int debug, int * preset ) {
 	ReDoCount = 0 ;
 	
 	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
-	printf("V2\n");
+	//printf("V2\n");
 	
 	if ( pFS ) {
 		return Return_board( SolveLoop( pFS ) ) ;
