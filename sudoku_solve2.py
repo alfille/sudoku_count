@@ -1,6 +1,8 @@
 import sys
 import tkinter as tk
 import tkinter.font as tkfont
+import tkinter.filedialog as tkfile
+import tkinter.messagebox as tkmessage
 import argparse
 import ctypes
 import platform
@@ -16,6 +18,7 @@ class Persist(tk.Frame):
 	Window = False
 	Debug = False
 	Fsize = 14
+	Data = None
 
 
 class Sudoku(tk.Frame):
@@ -39,6 +42,10 @@ class Sudoku(tk.Frame):
 
 		self.create_widgets()
 		self.create_menu()
+		if ( Persist.Data ):
+			self.SetData()
+		else:
+			self.BadData()
 		self.win.update()
 		self.set_win_sizes()
 
@@ -95,7 +102,7 @@ class Sudoku(tk.Frame):
 		tk.Button(self.pop,text="Back",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j: self.sq_popup_done(i,j)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
 		self.pop.grab_set()
 
-	def clear(self):
+	def Clear(self):
 		self.status.configure(text="Clearing...")
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
@@ -103,7 +110,7 @@ class Sudoku(tk.Frame):
 		self.status.configure(text="Cleared")
 		self.UnRed()
 				
-	def solve(self):
+	def Solve(self):
 		self.status.configure(text="Solving...")
 		self.master.update()
 		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
@@ -173,8 +180,8 @@ class Sudoku(tk.Frame):
 		self.buttons=tk.Frame(self.master,borderwidth=2,relief="flat",background="white")
 		if Persist.SUBSIZE > 2:
 			tk.Label(self.buttons,text=" {0}x{0} ".format(self.SIZE),relief="sunken",anchor="c",font=self.font).pack(side="left",fill=tk.Y)
-		tk.Button(self.buttons,text="Solve",command=self.solve,font=self.font).pack(side="left")
-		tk.Button(self.buttons,text="Clear",command=self.clear,font=self.font).pack(side="left")
+		tk.Button(self.buttons,text="Solve",command=self.Solve,font=self.font).pack(side="left")
+		tk.Button(self.buttons,text="Clear",command=self.Clear,font=self.font).pack(side="left")
 		tk.Button(self.buttons,text="Exit",command=self.Quit,font=self.font).pack(side="left")
 		self.status = tk.Label(self.buttons,text="Edit mode",relief="sunken",anchor="e")
 		self.status.pack(side="left",fill="both",expand=1)
@@ -190,7 +197,7 @@ class Sudoku(tk.Frame):
 					for ssj in range(Persist.SUBSIZE):
 						i = si*Persist.SUBSIZE+ssi
 						j = sj*Persist.SUBSIZE+ssj
-						self.but[i][j] = tk.Button(f,text=str(1+(i+j)%self.SIZE),borderwidth=3,height=1,width=1,font=self.font,command=lambda i=i,j=j: self.sq_popup(i,j))
+						self.but[i][j] = tk.Button(f,text=" ",borderwidth=3,height=1,width=1,font=self.font,command=lambda i=i,j=j: self.sq_popup(i,j))
 						self.but[i][j].grid(row=ssi, column=ssj)
 						if Persist.X and ((i==j) or (i == self.SIZE-j-1)):
 							self.but[i][j].configure(background="light yellow")
@@ -200,6 +207,20 @@ class Sudoku(tk.Frame):
 								if Persist.X and ((i==j) or (i == self.SIZE-j-1)):
 									self.but[i][j].configure(background="pale green")
 								
+	def BadData( self ):
+		for i in range(self.SIZE):
+			for j in range(self.SIZE):
+				self.but[i][j].configure(text=str(1+(i+j)%self.SIZE))
+
+	def SetData( self ):
+		for i in range(self.SIZE):
+			for j in range(self.SIZE):
+				self.but[i][j].configure(fg='black')
+				s = int(Persist.Data[i][j])
+				if s == "0":
+					s = " "
+				self.but[i][j].configure(text=s) # 1-based text values
+
 			
 	def about(self):
 		print("Sudoku Solve by Paul Alfille 2020")
@@ -228,8 +249,10 @@ class Sudoku(tk.Frame):
 
 		self.filemenu = tk.Menu(self.menu,tearoff=0)
 		self.menu.add_cascade(label="File",menu=self.filemenu,font=self.font)
-		self.filemenu.add_command(label="Solve",command=self.solve,font=self.font)
-		self.filemenu.add_command(label="Clear",command=self.clear,font=self.font)
+		self.filemenu.add_command(label="Load",command=self.Load,font=self.font)
+		self.filemenu.add_command(label="Save",command=self.Save,font=self.font)
+		self.filemenu.add_command(label="Solve",command=self.Solve,font=self.font)
+		self.filemenu.add_command(label="Clear",command=self.Clear,font=self.font)
 		self.filemenu.add_command(label="Exit",command=self.Quit,font=self.font)
 
 		self.sizemenu = tk.Menu(self.menu,tearoff=0)
@@ -254,6 +277,53 @@ class Sudoku(tk.Frame):
 		self.helpmenu.add_command(label="About",command=self.about,font=self.font)
 
 		self.master.config(menu=self.menu)
+			
+	def Load( self ):
+		Lfile = tkfile.askopenfile(mode="r",filetypes=[("Comma-separated-values","*.csv"),("All files","*.*")],title="Load a sudoku",parent=self.master)
+		if Lfile:
+			try:
+				i = 0
+				for line in Lfile:
+					if '#' in line:
+						[line,comment]=line.split('#')
+					if ',' in line:
+						v = line.split(',')
+						if i == 0 :
+							#first line, check size
+							Lsize = len(v)
+							if Lsize not in [4,9,16,25,36]:
+								tkmessage.showerror("File error","Not a recognized size")
+								Persist.Data=None
+								break
+							Persist.Data = [[0 for i in range(self.SIZE)] for j in range(self.SIZE)]
+
+						else:
+							if len(v) != Lsize:
+								tkmessage.showerror("File error","Value lists not the same size")
+								Persist.Data=None
+								break
+						Persist.Data[i] = [int(x) if x.isnumeric() else 0 for x in list(map(lambda s:s.strip(),v)) ]
+						if max(Persist.Data[i]) > Lsize or min(Persist.Data[i]) < 0 :
+								tkmessage.showerror("File error","Value out of range")
+								Persist.Data=None
+								break
+						i += 1
+						if i == Lsize:
+							#done
+							Persist.SUBSIZE = [x*x for x in range(7)].index(Lsize)
+							self.master.destroy()
+				Lfile.close()
+					
+			except UnicodeDecodeError:
+				tkmessage.showerror("Unreadable","File contains unreadable characters")
+				Persist.Data=None
+				return	
+
+	def Save( self ):
+		filename = tkfile.asksaveasfilename(filetypes=[("Comma-separated-values","*.csv"),("All files","*.*")],title="Save this sudoku board",parent=self.master)
+		if filename:
+			with open(filename,'w') as Sfile:
+				Sfile.write("\n".join([",".join([self.but[i][j].cget("text") for j in range(self.SIZE)]) for i in range(self.SIZE)])+"\n")
 
 def Libs():
 	# returns a dict

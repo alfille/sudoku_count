@@ -356,7 +356,7 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 			}
 		}
 		// should never fall though
-		++offset ;
+		offset += testi + testj ;
 		
 		// point
 		pFS->mask_bits[testi][testj] |= b ;
