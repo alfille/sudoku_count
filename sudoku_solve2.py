@@ -19,6 +19,38 @@ class Persist(tk.Frame):
 	Debug = False
 	Fsize = 14
 	Data = None
+	solve_lib = None
+	s_lib={}
+	Lib={}
+	
+	@classmethod
+	def LibSet(cls):		
+		for i in range(2,7):
+			cls.Lib[i] = False
+	
+	@classmethod
+	def LibUse(cls):
+		if not cls.Lib[cls.SUBSIZE]:
+			# Shared C library
+			lib_base = "./" #location
+			lib_base += "sudoku2_lib" # base name
+			
+			lib_base += str(cls.SUBSIZE*cls.SUBSIZE)	
+
+			# get the right filename
+			if platform.uname()[0] == "Windows":
+				lib_base += ".dll" 
+			if platform.uname()[0] == "Linux":
+				lib_base += ".so" 
+			else:
+				lib_base += ".dylib" 
+
+			# load library
+			cls.s_lib[cls.SUBSIZE] = ctypes.cdll.LoadLibrary(lib_base)
+			
+			cls.Lib[cls.SUBSIZE] = True
+	
+		cls.solve_lib = cls.s_lib[cls.SUBSIZE]
 
 
 class Sudoku(tk.Frame):
@@ -131,7 +163,7 @@ class Sudoku(tk.Frame):
 		w = 1 if Persist.Window else 0
 		d = 1 if Persist.Debug else 0
 
-		sol = solve_lib.Solve(x,w,d,arr)
+		sol = Persist.solve_lib.Solve(x,w,d,arr)
 		while True:
 			if sol == 0:
 				self.status.configure(text="Not solvable")
@@ -168,7 +200,7 @@ class Sudoku(tk.Frame):
 							self.but[i][j].configure(text=" ")
 						k += 1
 			self.master.update()
-			sol = solve_lib.Resume()
+			sol = Persist.solve_lib.Resume()
 	
 	def Quit(self):
 		sys.exit()
@@ -355,12 +387,13 @@ def main(args):
 	signal.signal(signal.SIGINT, signal_handler)
 
 	# set up library dist
-	global solve_lib
-	s_lib = Libs()
+	#global solve_lib
+	#s_lib = Libs()
+	Persist.LibSet()
 	 
 	while True:
 		# load library
-		solve_lib = s_lib[Persist.SUBSIZE]
+		Persist.LibUse()
 		Sudoku(master=tk.Tk()).mainloop()
 
 if __name__ == "__main__":
