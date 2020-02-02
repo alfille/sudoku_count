@@ -690,3 +690,10 @@ int Solve( int X, int Window, int debug, int * preset ) {
 	}
 }
 	
+// return 1=ok, 0 not. data in same array
+int Test( int X, int Window, int debug, int * preset ) {
+	struct FillState * pFS = Setup_board( preset ) ;
+	
+	return pFS != NULL ;
+}
+	

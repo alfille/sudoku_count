@@ -201,6 +201,28 @@ class Sudoku(tk.Frame):
 						k += 1
 			self.master.update()
 			sol = Persist.solve_lib.Resume()
+
+	def Test( self ):
+		if not self.just_test():
+			tkmessage.showinfo("Position test","Not valid")
+
+	def just_test(self):
+		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
+		k = 0
+		for i in range(self.SIZE):
+			for j in range(self.SIZE):
+				arr[k] = -1 # default blank
+				t = self.but[i][j].cget('text')
+				if t != " ":
+					arr[k] = int(t)-1 # 0-based values for squares
+					self.but[i][j].configure(fg="red")
+				k += 1
+
+		x = 1 if Persist.X else 0
+		w = 1 if Persist.Window else 0
+		d = 1 if Persist.Debug else 0
+
+		return (Persist.solve_lib.Test(x,w,d,arr)==1)
 	
 	def Quit(self):
 		sys.exit()
@@ -284,6 +306,7 @@ class Sudoku(tk.Frame):
 		self.filemenu.add_command(label="Load",command=self.Load,font=self.font)
 		self.filemenu.add_command(label="Save",command=self.Save,font=self.font)
 		self.filemenu.add_command(label="Solve",command=self.Solve,font=self.font)
+		self.filemenu.add_command(label="Test",command=self.Test,font=self.font)
 		self.filemenu.add_command(label="Clear",command=self.Clear,font=self.font)
 		self.filemenu.add_command(label="Exit",command=self.Quit,font=self.font)
 
@@ -315,9 +338,19 @@ class Sudoku(tk.Frame):
 		if Lfile:
 			try:
 				i = 0
+				Window = False
+				X = False
 				for line in Lfile:
 					if '#' in line:
 						[line,comment]=line.split('#')
+						if "=" in comment:
+							[var,val] = line.split("=")
+						else:
+							[var,val] = [comment,"true"]
+						if var == "window":
+							Window = (val=="true")
+						if var == "X":
+							X = (val=="true")
 					if ',' in line:
 						v = line.split(',')
 						if i == 0 :
@@ -342,6 +375,8 @@ class Sudoku(tk.Frame):
 						i += 1
 						if i == Lsize:
 							#done
+							Persist.X = X
+							Persiste.Window = Window
 							Persist.SUBSIZE = [x*x for x in range(7)].index(Lsize)
 							self.master.destroy()
 				Lfile.close()
@@ -355,6 +390,10 @@ class Sudoku(tk.Frame):
 		filename = tkfile.asksaveasfilename(filetypes=[("Comma-separated-values","*.csv"),("All files","*.*")],title="Save this sudoku board",parent=self.master)
 		if filename:
 			with open(filename,'w') as Sfile:
+				if Persist.Window:
+					Sfile.write("# window\n")
+				if Persist.X:
+					Sfile.write("# X\n")
 				Sfile.write("\n".join([",".join([self.but[i][j].cget("text") for j in range(self.SIZE)]) for i in range(self.SIZE)])+"\n")
 
 def Libs():
