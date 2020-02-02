@@ -38,22 +38,17 @@ SQRT_4  := 2
 
 powers := 4 9 16 25 36
 slibs := $(addsuffix $(lib), $(addprefix sudoku_lib, $(powers)))
-slibs2 := $(addsuffix $(lib), $(addprefix sudoku_lib2, $(powers)))
-sqrt := $(foreach s,$(slibs),$(SQRT_$(subst sudoku_lib,,$(basename $(s)))))
-
-test:
-	echo $(shell uname -s)
-	echo $(lib)
-	echo $(powers)
-	echo $(slibs)
-	echo $(sqrt)
+slibs2 := $(addsuffix $(lib), $(addprefix sudoku2_lib, $(powers)))
+progs := $(addprefix sudoku_count, $(powers))
 
 $(slibs): sudoku_lib.c $(deps)
 	$(CC) -fPIC -shared -DSUBSIZE=$(SQRT_$(subst sudoku_lib,,$(basename $@))) -o $@ $< $(CFLAGS)
 
 $(slibs2): sudoku2_lib.c $(deps)
-	$(CC) -fPIC -shared -DSUBSIZE=$(SQRT_$(subst sudoku_lib2,,$(basename $@))) -o $@ $< $(CFLAGS)
+	$(CC) -fPIC -shared -DSUBSIZE=$(SQRT_$(subst sudoku2_lib,,$(basename $@))) -o $@ $< $(CFLAGS)
 
+$(progs): sudoku_count.c $(RAN)
+	$(CC) -DSUBSIZE=$(SQRT_$(subst sudoku_count,,$(basename $@))) -o $@ $^ $(CFLAGS)
 
 least_connected: $(OBJLC)
 	$(CC) -o $@ $^ $(CFLAGS)
@@ -61,6 +56,4 @@ least_connected: $(OBJLC)
 most_connected: $(OBJMC)
 	$(CC) -o $@ $^ $(CFLAGS)
 
-all: sudoku_count sudoku_count36 sudoku_count25 sudoku_count16 sudoku_count9 sudoku_count4 \
-  least_connected most_connected \
-  $(slibs) $(slibs2)
+all: least_connected most_connected $(progs) $(slibs) $(slibs2)
