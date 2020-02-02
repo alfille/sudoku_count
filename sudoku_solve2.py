@@ -129,9 +129,9 @@ class Sudoku(tk.Frame):
 		for si in range(Persist.SUBSIZE):
 			for sj in range(Persist.SUBSIZE):
 				n = si*Persist.SUBSIZE+sj+1				
-				tk.Button(self.pop,text=str(n),borderwidth=4,height=2,width=3,font=self.font,command=lambda i=i,j=j,n=str(n): self.set_square(i,j,n)).grid(row=si,column=sj)
-		tk.Button(self.pop,text="Clear",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j,n=" ": self.set_square(i,j,n)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
-		tk.Button(self.pop,text="Back",borderwidth=4,height=2,font=self.font,command=lambda i=i,j=j: self.sq_popup_done(i,j)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
+				tk.Button(self.pop,text=str(n),borderwidth=3,height=1,width=1,font=self.font,command=lambda i=i,j=j,n=str(n): self.set_square(i,j,n)).grid(row=si,column=sj)
+		tk.Button(self.pop,text="Clear",borderwidth=3,height=2,font=self.font,command=lambda i=i,j=j,n=" ": self.set_square(i,j,n)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
+		tk.Button(self.pop,text="Back",borderwidth=3,height=2,font=self.font,command=lambda i=i,j=j: self.sq_popup_done(i,j)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
 		self.pop.grab_set()
 
 	def Clear(self):
