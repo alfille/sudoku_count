@@ -80,8 +80,8 @@ int reverse_pattern( int pat ) {
 #define MAXTRACK TOTALSIZE
 
 struct FillState {
-    int mask_bits[SIZE][SIZE] ;
-    int free_state[SIZE][SIZE] ;
+    int mask_bits[SIZE][SIZE] ; // bits unavailable
+    int free_state[SIZE][SIZE] ; // solution (<=0) or number of available solutions
     int * preset ;
     int done ;
 } State[MAXTRACK] ;
@@ -137,7 +137,7 @@ struct FillState * StateStackPop( void ) {
 }
 
 struct Subsets {
-	int * okbits[SIZE] ;
+	int * mask_bits[SIZE] ;
 	int entries ;
 } Subset ;
 
@@ -146,18 +146,57 @@ void Subset_init( void ) {
 }
 
 void Subset_add( int * p ) {
-	Subset.okbits[ Subset.entries++ ] = p ;
+	Subset.mask_bits[ Subset.entries++ ] = p ;
 }
 
 int Subset_union( int pat ) {
-	int U = 0 ;
-	int * p ;
-	for( p=Subset.okbits; pat ; pat>>=1, ++p ) {
+	int U = full_pattern ;
+	int ** p ;
+	for( p=Subset.mask_bits; pat ; pat>>=1, ++p ) {
 		if (pat&0x1) {
-			U |= p[0] ;
+			U &= **p ;
 		}
 	}
-	return U ;
+	return U ^ full_pattern ;
+}
+
+int Subset_remove( int pat, int mask ) {
+	int ** p ;
+	int any = 0 ;
+	for( p=Subset.mask_bits; pat ; pat>>=1, ++p ) {
+		if (pat&0x1 == 0) {
+			any |= (**p & mask) ;
+			**p |= mask ;
+		}
+	}
+	return any ;
+}
+
+// Check each supset to see if
+// 0==not enough choices
+// 1==too many choices or already consistent
+// 2==just enough choices and rest can be reduced
+int Subset_test_all( void ) {
+	int pat ; // patterns for subset (actually a bit map)
+	for ( pat = 1 ; pat < (1<<Subset.entries) ; ++ pat ) {
+		int cob_pat = Count_bits( pat ) ;
+		if ( cob_pat > 1 ) { // no point in looking at singles
+			int U = Subset_union( pat ) ;
+			int cob_U = Count_bits( U ) ;
+			if ( cob_U < cob_pat ) {
+				// not enough choices in the subset
+				return 0 ;
+			} else if ( cob_pat == Subset.entries ) {
+				continue ;
+			} else if ( cob_U == cob_pat ) {
+				// just enough in proper subset
+				if ( Subset_remove( pat, U ) ) {
+					return 2 ;
+				}
+			}	
+		}
+	}
+	return 1 ;
 }
 
 int CheckSS( int i, int j, struct FillState * pFS ) {
@@ -812,11 +851,3 @@ int TestUnique( int X, int Window, int debug, int * preset ) {
 	
 	return 2 ;
 }
-
-Test_bits() {
-	uint32_t i ;
-	for ( i=0 ; i<100 ; ++i ) {
-		printf("%4X -> %d\n", i , Count_bits(i) ) ;
-	}
-}	
-	
