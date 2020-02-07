@@ -36,8 +36,6 @@ void RuptHandler( int sig ) {
 	exit(1);
 }
 
-
-
 // Special
 static int Xpattern ;
 static int Wpattern ;
@@ -56,6 +54,14 @@ void make_pattern(void) {
         pattern[i] = 1<<i ;
         full_pattern |= pattern[i] ;
     }
+}
+
+int Count_bits( uint32_t i ) {
+     // Java: use >>> instead of >>
+     // C or C++: use uint32_t
+     i -= ((i >> 1) & 0x55555555);
+     i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
+     return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
 }
 
 // Find number from bit pattern (for printing)
@@ -128,6 +134,30 @@ struct FillState * StateStackPop( void ) {
         statestack.end = ( statestack.end + statestack.size - 1 ) % statestack.size ; // make sure positive modulo
         return & State[statestack.end] ;
     }
+}
+
+struct Subsets {
+	int * okbits[SIZE] ;
+	int entries ;
+} Subset ;
+
+void Subset_init( void ) {
+	Subset.entries = 0 ;
+}
+
+void Subset_add( int * p ) {
+	Subset.okbits[ Subset.entries++ ] = p ;
+}
+
+int Subset_union( int pat ) {
+	int U = 0 ;
+	int * p ;
+	for( p=Subset.okbits; pat ; pat>>=1, ++p ) {
+		if (pat&0x1) {
+			U |= p[0] ;
+		}
+	}
+	return U ;
 }
 
 int CheckSS( int i, int j, struct FillState * pFS ) {
@@ -579,6 +609,52 @@ struct FillState * SolveLoop( struct FillState * pFS ) {
 	return pFS ;
 }
 
+// For TestUnique -- no pause/resume
+// Find first solution
+struct FillState * SolveLoopUntimed1( struct FillState * pFS ) {	
+	while ( pFS && pFS->done == 0 ) {
+		//printf("Solveloop\n");
+		pFS = Next_move( pFS ) ;
+		if ( (pFS == NULL) || CheckAvailable( pFS ) ) {
+			if ( Debug ) {
+				printf("Pop");
+			}
+			pFS = StateStackPop() ;
+		}
+	}
+	//print_square( pFS ) ;
+	return pFS ;
+}
+
+// For TestUnique -- no pause/resume
+// Find second solution
+// Assumes pFS not NULL initially
+struct FillState * SolveLoopUntimed2( struct FillState * pFS ) {
+	if ( Debug ) {
+		printf("\nLook for second solution:");
+	}
+	pFS = StateStackPop() ; // Go back to prior
+	if ( Debug ) {
+		printf("Pop");
+	}
+	if (pFS == NULL ) {
+		return pFS ;
+	}
+	pFS->done = 0 ; // Look again
+	while ( pFS && pFS->done == 0 ) {
+		//printf("Solveloop\n");
+		pFS = Next_move( pFS ) ;
+		if ( (pFS == NULL) || CheckAvailable( pFS ) ) {
+			if ( Debug ) {
+				printf("Pop");
+			}
+			pFS = StateStackPop() ;
+		}
+	}
+	//print_square( pFS ) ;
+	return pFS ;
+}
+
 struct FillState * Setup_board( int * preset ) {
 	// preset is an array of TOTALSIZE length
 	// sent from python
@@ -696,4 +772,51 @@ int Test( int X, int Window, int debug, int * preset ) {
 	
 	return pFS != NULL ;
 }
+
+// Is there:
+//	0 no solution
+//	1 unique solution
+//	2 1+ solutions
+//
+// Does NOT show solution
+int TestUnique( int X, int Window, int debug, int * preset ) {
+	struct FillState * pFS = Setup_board( preset ) ;
+	
+	signal( SIGINT, RuptHandler ) ;
+	pFS_interrupted = NULL ;
+
+	Xpattern = X ;
+	Wpattern = Window ;
+	Debug = debug ;
+	ReDoCount = 0 ;
+	
+	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
+	//printf("V2\n");
+	
+	if ( pFS == NULL ) {
+		// inconsistent setup
+		return 0 ;
+	}
+	
+	pFS = SolveLoopUntimed1( pFS ) ;
+	if ( pFS==NULL ) {
+		// No solution
+		return 0 ;
+	}
+	
+	pFS = SolveLoopUntimed2( pFS ) ;
+	if ( pFS==NULL ) {
+		// No 2nd solution
+		return 1 ;
+	}
+	
+	return 2 ;
+}
+
+Test_bits() {
+	uint32_t i ;
+	for ( i=0 ; i<100 ; ++i ) {
+		printf("%4X -> %d\n", i , Count_bits(i) ) ;
+	}
+}	
 	

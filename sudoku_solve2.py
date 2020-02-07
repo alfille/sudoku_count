@@ -22,6 +22,7 @@ class Persist(tk.Frame):
 	solve_lib = None
 	s_lib={}
 	Lib={}
+	mode = "normal"
 	
 	@classmethod
 	def LibSet(cls):		
