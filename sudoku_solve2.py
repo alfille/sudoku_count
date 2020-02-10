@@ -154,10 +154,10 @@ class Sudoku(tk.Frame):
 				arr[k] = -1 # default blank
 				t = self.but[i][j].cget('text')
 				if t != " ":
-					arr[k] = int(t)-1 # 0-based values for squares
+					arr[k] = int(t) # 1-based values for squares
 					self.but[i][j].configure(fg="red")
-					#print(i,j,k,arr[k])
-				#print("{} -> {}".format(k,arr[k]))
+				else:
+					arr[k] = 0
 				k += 1
 
 		x = 1 if Persist.X else 0
@@ -179,8 +179,8 @@ class Sudoku(tk.Frame):
 				k = 0
 				for i in range(self.SIZE):
 					for j in range(self.SIZE):
-						if arr[k] >= 0 :
-							self.but[i][j].configure(text=str(arr[k]+1)) # 1-based text values
+						if arr[k] > 0 :
+							self.but[i][j].configure(text=str(arr[k])) # 1-based text values
 							if self.but[i][j].cget('fg') == 'blue':
 								self.but[i][j].configure(fg='black')
 						else:
@@ -195,8 +195,8 @@ class Sudoku(tk.Frame):
 					for j in range(self.SIZE):
 						if self.but[i][j].cget('fg') != 'red':
 							self.but[i][j].configure(fg='blue')
-						if arr[k] >= 0 :
-							self.but[i][j].configure(text=str(arr[k]+1)) # 1-based text values
+						if arr[k] > 0 :
+							self.but[i][j].configure(text=str(arr[k])) # 1-based text values
 						else:
 							self.but[i][j].configure(text=" ")
 						k += 1
@@ -212,11 +212,12 @@ class Sudoku(tk.Frame):
 		k = 0
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
-				arr[k] = -1 # default blank
 				t = self.but[i][j].cget('text')
 				if t != " ":
-					arr[k] = int(t)-1 # 0-based values for squares
+					arr[k] = int(t) # 1-based values for squares
 					self.but[i][j].configure(fg="red")
+				else:
+					arr[k] = 0
 				k += 1
 
 		x = 1 if Persist.X else 0

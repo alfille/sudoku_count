@@ -29,9 +29,6 @@ time_t next_time ;
 
 #define Zero(array) memset( array, 0, sizeof(array) ) ;
 
-#define VAL2FREE( v ) ( -((v)+1) )
-#define FREE2VAL( f ) ( -((f)+1) )
-
 void RuptHandler( int sig ) {
 	exit(1);
 }
@@ -43,7 +40,7 @@ static int Debug ;
 static int ReDoCount ;
 
 // bit pattern
-static int pattern[SIZE] ;
+static int pattern[SIZE+1] ;
 static int full_pattern ;
 
 // Make numbers int bit pattern (1=0x1 2=0x2 3=0x4...)
@@ -51,8 +48,8 @@ void make_pattern(void) {
     int i ;
     full_pattern = 0 ;
     for (i=0;i<SIZE;++i) {
-        pattern[i] = 1<<i ;
-        full_pattern |= pattern[i] ;
+        pattern[i+1] = 1<<i ;
+        full_pattern |= pattern[i+1] ;
     }
 }
 
@@ -67,9 +64,9 @@ int Count_bits( uint32_t i ) {
 // Find number from bit pattern (for printing)
 int reverse_pattern( int pat ) {
     int i ;
-    for (i=0 ; i<SIZE;++i) {
+    for (i=1 ; i<=SIZE; ++i) {
         if ( pattern[i] == pat ) {
-            return i+1 ;
+            return i ;
         }
     }
     // should never happen
@@ -81,7 +78,7 @@ int reverse_pattern( int pat ) {
 
 struct FillState {
     int mask_bits[SIZE][SIZE] ; // bits unavailable
-    int free_state[SIZE][SIZE] ; // solution (<=0) or number of available solutions
+    int value[SIZE][SIZE] ; // solution (<=0) or number of available solutions
     int * preset ;
     int done ;
 } State[MAXTRACK] ;
@@ -100,8 +97,8 @@ struct FillState * StateStackInit ( int * preset ) {
     statestack.start = statestack.end = 0 ;
 	for ( i=0 ; i<SIZE ; ++i ) {
 		for ( j=0 ; j<SIZE ; ++j ) {
-			State[0].mask_bits[i][j] = 0 ;
-			State[0].free_state[i][j] = SIZE ;
+			State[0].mask_bits[i][j] = full_pattern ; // all possible
+			State[0].value[i][j] = 0 ; // none set
 		}
 	}
 	State[0].done = 0 ;
@@ -145,166 +142,138 @@ void Subset_init( void ) {
 	Subset.entries = 0 ;
 }
 
-void Subset_add( int * p ) {
-	Subset.mask_bits[ Subset.entries++ ] = p ;
+void Subset_add( struct FillState * pFS, int i, int j ) {
+	//printf( "(%d,%d) ",i,j);
+	Subset.mask_bits[ Subset.entries++ ] = &(pFS->mask_bits[i][j]) ;
+}
+
+void Subset_print( void ) {
+	if ( Subset.entries ) {
+		int i ;
+		printf("\nSubset %d ",Subset.entries) ;
+		for ( i=0 ; i<Subset.entries ; ++i ) {
+			printf("%p ",Subset.mask_bits[i] ) ;
+		}
+		printf("\n");
+		for ( i=0 ; i<Subset.entries ; ++i ) {
+			printf("%X ",Subset.mask_bits[i][0] ) ;
+		}
+		printf("\n");
+	}
 }
 
 int Subset_union( int pat ) {
-	int U = full_pattern ;
+	int U = 0 ;
 	int ** p ;
 	for( p=Subset.mask_bits; pat ; pat>>=1, ++p ) {
 		if (pat&0x1) {
-			U &= **p ;
+			U |= **p ;
 		}
 	}
-	return U ^ full_pattern ;
+	return U ;
 }
 
-int Subset_remove( int pat, int mask ) {
+void Subset_remove( int pat, int mask ) {
 	int ** p ;
-	int any = 0 ;
-	for( p=Subset.mask_bits; pat ; pat>>=1, ++p ) {
-		if (pat&0x1 == 0) {
-			any |= (**p & mask) ;
-			**p |= mask ;
+	int apat = ( (1<<Subset.entries) -1 ) ^ pat ;
+	for( p=Subset.mask_bits; apat ; apat>>=1, ++p ) {
+		if ( apat&0x1 ) {
+			**p &= (full_pattern ^ mask) ;
 		}
 	}
-	return any ;
 }
 
 // Check each supset to see if
-// 0==not enough choices
-// 1==too many choices or already consistent
-// 2==just enough choices and rest can be reduced
-int Subset_test_all( void ) {
+// 1==not enough choices
+// 0 fine
+int Subset_test( void ) {
 	int pat ; // patterns for subset (actually a bit map)
-	for ( pat = 1 ; pat < (1<<Subset.entries) ; ++ pat ) {
+	int all_bits = (1<<Subset.entries) - 1 ;
+	
+	// Full Subset
+	if ( Count_bits(Subset_union( all_bits ) ) < Subset.entries ) {
+		// too few choices
+		return 1 ;
+	}
+	
+	for ( pat = 2 ; pat < all_bits ; ++pat ) {
 		int cob_pat = Count_bits( pat ) ;
 		if ( cob_pat > 1 ) { // no point in looking at singles
 			int U = Subset_union( pat ) ;
 			int cob_U = Count_bits( U ) ;
 			if ( cob_U < cob_pat ) {
 				// not enough choices in the subset
-				return 0 ;
-			} else if ( cob_pat == Subset.entries ) {
-				continue ;
+				return 1 ;
 			} else if ( cob_U == cob_pat ) {
 				// just enough in proper subset
-				if ( Subset_remove( pat, U ) ) {
-					return 2 ;
-				}
+				Subset_remove( pat, U ) ;
 			}	
 		}
 	}
-	return 1 ;
+	return 0 ;
 }
 
-int CheckSS( int i, int j, struct FillState * pFS ) {
+void CheckSS( int i, int j, struct FillState * pFS ) {
 	// Check subsquare
 	
 	int si,sj ;
-	int mask = 0 ;
 	
 	for (si=0 ; si<SUBSIZE ; ++si ) {
 		for ( sj=0 ; sj<SUBSIZE ; ++sj ) {
-			int val = FREE2VAL( pFS->free_state[si+i][sj+j] );
-			if ( val >= 0 ) {
-				mask |= pattern[val] ;
-			} else {
-				mask |= (~pFS->mask_bits[si+i][sj+j] & full_pattern) ;
-			}
-			if ( mask == full_pattern ) {
-				return 0;
+			if ( pFS->value[si+i][sj+j] == 0 ) {
+				Subset_add( pFS, si+i, sj+j ) ;
 			}
 		}
 	}
-	//printf("UnavailableSS\n");
-	return 1 ;
 }
 
-int CheckR( int i, struct FillState * pFS ) {
+void CheckR( int i, struct FillState * pFS ) {
 	// Check subsquare
 	
 	int j ;
-	int mask = 0 ;
 	
 	for (j=0 ; j<SIZE ; ++j ) {
-		int val = FREE2VAL( pFS->free_state[i][j] );
-		if ( val >= 0 ) {
-			mask |= pattern[val] ;
-		} else {
-			mask |= (~pFS->mask_bits[i][j] & full_pattern) ;
-		}
-		if ( mask == full_pattern ) {
-			return 0;
+		if ( pFS->value[i][j] == 0 ) {
+			Subset_add( pFS, i, j ) ;
 		}
 	}
-	//printf("UnavailableR\n");
-	return 1 ;
 }
 
-int CheckC( int j, struct FillState * pFS ) {
+void CheckC( int j, struct FillState * pFS ) {
 	// Check subsquare
 	
 	int i ;
-	int mask = 0 ;
 	
 	for (i=0 ; i<SIZE ; ++i ) {
-		int val = FREE2VAL( pFS->free_state[i][j] );
-		if ( val >= 0 ) {
-			mask |= pattern[val] ;
-		} else {
-			mask |= (~pFS->mask_bits[i][j] & full_pattern) ;
-		}
-		if ( mask == full_pattern ) {
-			return 0;
+		if ( pFS->value[i][j] == 0 ) {
+			Subset_add( pFS, i, j ) ;
 		}
 	}
-	//printf("UnavailableC\n");
-	return 1 ;
 }
 
-int CheckD1( struct FillState * pFS ) {
+void CheckD1( struct FillState * pFS ) {
 	// Check subsquare
 	
 	int i ;
-	int mask = 0 ;
 	
 	for (i=0 ; i<SIZE ; ++i ) {
-		int val = FREE2VAL( pFS->free_state[i][i] );
-		if ( val >= 0 ) {
-			mask |= pattern[val] ;
-		} else {
-			mask |= (~pFS->mask_bits[i][i] & full_pattern) ;
-		}
-		if ( mask == full_pattern ) {
-			return 0;
+		if (  pFS->value[i][i] == 0 ) {
+			Subset_add( pFS, i, i ) ;
 		}
 	}
-	//printf("UnavailableD1\n");
-	return 1 ;
 }
 
-int CheckD2( struct FillState * pFS ) {
+void CheckD2( struct FillState * pFS ) {
 	// Check subsquare
 	
 	int i ;
-	int mask = 0 ;
 	
 	for (i=0 ; i<SIZE ; ++i ) {
 		int j = SIZE-1-i ;
-		int val = FREE2VAL( pFS->free_state[i][j] );
-		if ( val >= 0 ) {
-			mask |= pattern[val] ;
-		} else {
-			mask |= (~pFS->mask_bits[i][j] & full_pattern) ;
-		}
-		if ( mask == full_pattern ) {
-			return 0;
+		if ( pFS->value[i][j] == 0 ) {
+			Subset_add( pFS, i, j ) ;
 		}
 	}
-	//printf("UnavailableD2\n");
-	return 1 ;
 }
 
 int CheckAvailable( struct FillState * pFS ) {
@@ -315,14 +284,18 @@ int CheckAvailable( struct FillState * pFS ) {
 	int i,j ;
 	
 	for (i=0 ; i<SIZE ; ++i ) {
-		if ( CheckR( i, pFS ) ) {
+		Subset_init() ;
+		CheckR( i, pFS ) ;
+		if ( Subset_test() ) {
 			return 1 ;
 		}
 	}
 	
 	for (i=0; i<SIZE; i+=SUBSIZE) {
 		for (j=0; j<SIZE; j+=SUBSIZE) {
-			if (CheckSS(i,j,pFS)) {
+			Subset_init() ;
+			CheckSS(i,j,pFS) ;
+			if ( Subset_test() ) {
 				return 1 ;
 			}
 		}
@@ -331,7 +304,9 @@ int CheckAvailable( struct FillState * pFS ) {
 	if ( Wpattern ) {
 		for (i=1; i<SIZE; i+=SUBSIZE+1) {
 			for (j=1; j<SIZE; j+=SUBSIZE+1) {
-				if (CheckSS(i,j,pFS)) {
+				Subset_init() ;
+				CheckSS(i,j,pFS) ;
+				if ( Subset_test() ) {
 					return 1 ;
 				}
 			}
@@ -339,13 +314,23 @@ int CheckAvailable( struct FillState * pFS ) {
 	}
 	
 	for (j=0 ; j<SIZE ; ++j ) {
-		if ( CheckC( j, pFS ) ) {
+		Subset_init() ;
+		CheckC( j, pFS ) ; 
+		if ( Subset_test() ) {
 			return 1 ;
 		}
 	}
 	
 	if ( Xpattern ) {
-		if ( CheckD1( pFS ) || CheckD2( pFS ) ) {
+		Subset_init() ;
+		CheckD1( pFS ) ;
+		if ( Subset_test() ) {
+			return 1 ;
+		}
+		
+		Subset_init() ;
+		CheckD2( pFS ) ;
+		if ( Subset_test() ) {
 			return 1 ;
 		}
 	}
@@ -370,8 +355,7 @@ void print_square( struct FillState * pFS ) {
 	for (i=0 ; i<SIZE ; ++i ) { // each row
 		for ( j=0 ; j<SIZE ; ++j ) {
 			int c = (j%SUBSIZE)?':':'|' ;
-            int v = FREE2VAL( pFS->free_state[i][j] );
-			fprintf(stderr,"%c%2X ",c,v>=0?v:0xA);
+			fprintf(stderr,"%c%2X ",c,pFS->value[i][j]);
 		}
 		// end of row
 		fprintf(stderr,"|\n");
@@ -392,22 +376,20 @@ void print_square( struct FillState * pFS ) {
 // Enter with current position set in free_state
 struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 	int si, sj, k ;
-	int val = FREE2VAL( pFS->free_state[testi][testj] );
-	int b ;
+	int val = pFS->value[testi][testj] ;
+	int b, antib ;
 	static int offset = 0 ;
-	//char debug ;
-	//printf("Set %d %d bit=%X mask=%X\n",testi,testj,pFS->free_state[testi][testj],pFS->mask_bits[testi][testj]);
-	//debug = getchar() ;
+	//printf("Set %d %d bit=%X mask=%X\n",testi,testj,pFS->value[testi][testj],pFS->mask_bits[testi][testj]);
 
-	if ( val >= 0 ) {
+	if ( val > 0 ) {
 		// already set (preset from GUI)
 		//fprintf(stderr,"Set: Position %d,%d already set\n",testi,testj) ;
 		b = pattern[val] ;
-		if ( (b&pFS->mask_bits[testi][testj]) ) {
+		if ( (b&pFS->mask_bits[testi][testj]) == 0 ) {
 			return NULL ;
 		}
 		// point mask
-		pFS->mask_bits[testi][testj] |= b ;
+		pFS->mask_bits[testi][testj] ^= b ;
 	} else {
 		// Not already set (Part of solve search)
 		// find clear bit
@@ -415,11 +397,10 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 		int v ;
 		for ( v = 0 ; v < SIZE ; ++v ) {
 			// Start fram a more varied number
-//			val = (testi+testj+v) % SIZE ;
-			val = (offset+v) % SIZE ;
+			val = ((offset+v) % SIZE) + 1 ;
 			b = pattern[val] ;
 			//printf("val=%d b=%X mask=%X b&mask=%X\n",val,b,mask,b&mask ) ;
-			if ( (b & mask) == 0 ) {
+			if ( b & mask ) {
 				//printf("Try val %d at %d,%d\n",val,testi,testj);
 				break ;
 			}
@@ -428,58 +409,48 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 		offset += testi + testj ;
 		
 		// point
-		pFS->mask_bits[testi][testj] |= b ;
-		--pFS->free_state[testi][testj] ;
+		pFS->mask_bits[testi][testj] ^= b ;
 		
 		// Push state (with current choice masked out) if more than one choice
-		if ( pFS->free_state[testi][testj] > 0 ) {
+		if ( pFS->mask_bits[testi][testj] ) {
 			if ( Debug ) {
 				printf("Push");
 			}
 			pFS = StateStackPush() ;
 		}
 		// Now set this choice
-		pFS->free_state[testi][testj] = VAL2FREE(val) ;
+		pFS->value[testi][testj] = val ;
 	
 	}
 
+	antib = full_pattern ^ b ;
 
 	// mask out row everywhere else
 	for( k=0 ; k<SIZE ; ++k ) {
 		// row
-		if ( pFS->free_state[testi][k] < 0 ) {
+		if ( pFS->value[testi][k] > 0 ) {
 			// assigned
 			continue ;
 		}
-		if ( pFS->mask_bits[testi][k] & b ) {
-			// already masked
-			continue ;
-		}
-		if ( pFS->free_state[testi][k] == 1 ) {
+		pFS->mask_bits[testi][k] &= antib ;
+		if ( pFS->mask_bits[testi][k] == 0 ) {
 			// nothing left
 			return NULL ;
 		}
-		pFS->mask_bits[testi][k] |= b ;
-		--pFS->free_state[testi][k] ;
 	}
 
 	// mask out column everywhere else
 	for( k=0 ; k<SIZE ; ++k ) {
 		// row
-		if ( pFS->free_state[k][testj] < 0 ) {
+		if ( pFS->value[k][testj] > 0 ) {
 			// assigned
 			continue ;
 		}
-		if ( pFS->mask_bits[k][testj] & b ) {
-			// already masked
-			continue ;
-		}
-		if ( pFS->free_state[k][testj] == 1 ) {
+		pFS->mask_bits[k][testj] &= antib ;
+		if ( pFS->mask_bits[k][testj] == 0 ) {
 			// nothing left
 			return NULL ;
 		}
-		pFS->mask_bits[k][testj] |= b ;
-		--pFS->free_state[k][testj] ;
 	}
 
 	// subsquare
@@ -488,20 +459,15 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 			int i = SUBSIZE * (testi/SUBSIZE) + si ;
 			int j = SUBSIZE * (testj/SUBSIZE) + sj ;
 			// row
-			if ( pFS->free_state[i][j] < 0 ) {
+			if ( pFS->value[i][j] > 0 ) {
 				// assigned
 				continue ;
 			}
-			if ( pFS->mask_bits[i][j] & b ) {
-				// already masked
-				continue ;
-			}
-			if ( pFS->free_state[i][j] == 1 ) {
+			pFS->mask_bits[i][j] &= antib ;
+			if ( pFS->mask_bits[i][j] == 0 ) {
 				// nothing left
 				return NULL ;
 			}
-			pFS->mask_bits[i][j] |= b ;
-			--pFS->free_state[i][j] ;
 		}
 	}
 	
@@ -509,38 +475,28 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 	if ( Xpattern ) {
 		if ( testi==testj ) {
 			for ( k=0 ; k<SIZE ; ++k ) {
-				if ( pFS->free_state[k][k] < 0 ) {
+				if ( pFS->value[k][k] > 0 ) {
 					// assigned
 					continue ;
 				}
-				if ( pFS->mask_bits[k][k] & b ) {
-					// already masked
-					continue ;
-				}
-				if ( pFS->free_state[k][k] == 1 ) {
+				pFS->mask_bits[k][k] &= antib ;
+				if ( pFS->mask_bits[k][k] == 0 ) {
 					// nothing left
 					return NULL ;
 				}
-				pFS->mask_bits[k][k] |= b ;
-				--pFS->free_state[k][k] ;
 			}
 		} else if ( testi==SIZE-1-testj ) {
 			for ( k=0 ; k<SIZE ; ++k ) {
 				int l = SIZE - 1 - k ;
-				if ( pFS->free_state[k][l] < 0 ) {
+				if ( pFS->value[k][l] > 0 ) {
 					// assigned
 					continue ;
 				}
-				if ( pFS->mask_bits[k][l] & b ) {
-					// already masked
-					continue ;
-				}
-				if ( pFS->free_state[k][l] == 1 ) {
+				pFS->mask_bits[k][l] &= antib ;
+				if ( pFS->mask_bits[k][l] == 0 ) {
 					// nothing left
 					return NULL ;
 				}
-				pFS->mask_bits[k][l] |= b ;
-				--pFS->free_state[k][l] ;
 			}
 		}
 	}
@@ -553,20 +509,15 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 				for( sj=0 ; sj<SUBSIZE ; ++sj ) {
 					int j = (testj / (SUBSIZE+1)) * (SUBSIZE+1) + 1 + sj ;
 					// row
-					if ( pFS->free_state[i][j] < 0 ) {
+					if ( pFS->value[i][j] > 0 ) {
 						// assigned
 						continue ;
 					}
-					if ( pFS->mask_bits[i][j] & b ) {
-						// already masked
-						continue ;
-					}
-					if ( pFS->free_state[i][j] == 1 ) {
+					pFS->mask_bits[i][j] &= antib ;
+					if ( pFS->mask_bits[i][j] == 0 ) {
 						// nothing left
 						return NULL ;
 					}
-					pFS->mask_bits[i][j] |= b ;
-					--pFS->free_state[i][j] ;
 				}
 			}
 		}
@@ -574,8 +525,6 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 	
 	return pFS ;
 }
-		
-
 
 struct FillState * Next_move( struct FillState * pFS ) {
 	int i ;
@@ -586,8 +535,8 @@ struct FillState * Next_move( struct FillState * pFS ) {
     //print_square( pFS ) ;
     for ( i=0 ; i < SIZE ; ++i ) {
 		for ( j=0 ; j< SIZE ; ++j ) {
-			int free_state = pFS->free_state[i][j] ;
-			if ( free_state < 0 ) {
+			int free_state = Count_bits(pFS->mask_bits[i][j]) ;
+			if ( pFS->value[i][j] > 0 ) {
 				// already set
 				//printf("Slot %d,%d already set\n",i,j);
 				continue ;		
@@ -703,22 +652,25 @@ struct FillState * Setup_board( int * preset ) {
 	
 	int i, j ;
 	int * set = preset ; // pointer though preset array
-	struct FillState * pFS = StateStackInit( preset ) ;
+	struct FillState * pFS ;
 	
 	//printf("LIB\n") ;
 	make_pattern() ; // set up bit pattern list
+	pFS = StateStackInit( preset ) ; // needs make_pattern
 	
 	for ( i=0 ; i<SIZE ; ++i ) {
 		for ( j=0 ; j<SIZE ; ++j ) {
-			if ( set[0] > -1 && set[0] < SIZE ) {
-				pFS->free_state[i][j] = VAL2FREE( set[0] ) ;
-				//print_square( pFS ) ;
-				//printf("LIB: %d -> %d -> %d\n",set[0],VAL2FREE(set[0]),FREE2VAL(VAL2FREE(set[0])));
+			int v = set[0] ;
+			if ( v > 0 && v <= SIZE ) {
+				pFS->value[i][j] = v ;
 				pFS = Set_Square( pFS, i, j ) ;
 				if ( pFS == NULL ) {
-					// bad input 
+					// bad input (inconsistent)
 					return NULL ;
 				}
+			} else if ( v != 0 ) {
+				fprintf( stderr,"Input value out of range: %d\n",v);
+				return NULL ;
 			}
 			++set ; // move to next entry
 		}
@@ -736,9 +688,7 @@ int Return_board( struct FillState * pFS ) {
 		set = pFS->preset ;
 		for ( i=0 ; i<SIZE ; ++i ) {
 			for ( j=0 ; j<SIZE ; ++j ) {
-				int val = FREE2VAL( pFS->free_state[i][j] ) ; 
-				//printf("(%d)",val ) ;
-				set[0] = val >= 0 ? val : -1 ;
+				set[0] = pFS->value[i][j] ; 
 				++set ; // move to next entry
 			}
 		}
