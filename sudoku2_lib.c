@@ -173,26 +173,32 @@ int Subset_union( int pat ) {
 	return U ;
 }
 
-void Subset_remove( int pat, int mask ) {
+int Subset_remove( int pat, int mask ) {
 	int ** p ;
+	int any = 0 ;
 	int apat = ( (1<<Subset.entries) -1 ) ^ pat ;
 	for( p=Subset.mask_bits; apat ; apat>>=1, ++p ) {
 		if ( apat&0x1 ) {
+			any |= ((**p) & mask ) ;
 			**p &= (full_pattern ^ mask) ;
 		}
 	}
+	return any ;
 }
 
 // Check each supset to see if
 // 1==not enough choices
 // 0 fine
-int Subset_test( void ) {
+int Subset_test( int * retest ) {
 	int pat ; // patterns for subset (actually a bit map)
 	int all_bits = (1<<Subset.entries) - 1 ;
 	
 	// Full Subset
 	if ( Count_bits(Subset_union( all_bits ) ) < Subset.entries ) {
 		// too few choices
+		if ( Debug ) {
+			printf("Set sparse ") ;
+		}
 		return 1 ;
 	}
 	
@@ -203,10 +209,13 @@ int Subset_test( void ) {
 			int cob_U = Count_bits( U ) ;
 			if ( cob_U < cob_pat ) {
 				// not enough choices in the subset
+				if ( Debug ) {
+					printf("Subset sparse ") ;
+				}
 				return 1 ;
 			} else if ( cob_U == cob_pat ) {
 				// just enough in proper subset
-				Subset_remove( pat, U ) ;
+				*retest |= Subset_remove( pat, U ) ;
 			}	
 		}
 	}
@@ -282,58 +291,63 @@ int CheckAvailable( struct FillState * pFS ) {
 	// Return 1 if not possible
 	
 	int i,j ;
+	int retest ;
 	
-	for (i=0 ; i<SIZE ; ++i ) {
-		Subset_init() ;
-		CheckR( i, pFS ) ;
-		if ( Subset_test() ) {
-			return 1 ;
-		}
-	}
-	
-	for (i=0; i<SIZE; i+=SUBSIZE) {
-		for (j=0; j<SIZE; j+=SUBSIZE) {
+	do {
+		retest = 0 ;
+		
+		for (i=0 ; i<SIZE ; ++i ) {
 			Subset_init() ;
-			CheckSS(i,j,pFS) ;
-			if ( Subset_test() ) {
+			CheckR( i, pFS ) ;
+			if ( Subset_test( &retest ) ) {
 				return 1 ;
 			}
 		}
-	}
-	
-	if ( Wpattern ) {
-		for (i=1; i<SIZE; i+=SUBSIZE+1) {
-			for (j=1; j<SIZE; j+=SUBSIZE+1) {
+		
+		for (i=0; i<SIZE; i+=SUBSIZE) {
+			for (j=0; j<SIZE; j+=SUBSIZE) {
 				Subset_init() ;
 				CheckSS(i,j,pFS) ;
-				if ( Subset_test() ) {
+				if ( Subset_test( &retest ) ) {
 					return 1 ;
 				}
 			}
 		}
-	}
-	
-	for (j=0 ; j<SIZE ; ++j ) {
-		Subset_init() ;
-		CheckC( j, pFS ) ; 
-		if ( Subset_test() ) {
-			return 1 ;
-		}
-	}
-	
-	if ( Xpattern ) {
-		Subset_init() ;
-		CheckD1( pFS ) ;
-		if ( Subset_test() ) {
-			return 1 ;
+		
+		if ( Wpattern ) {
+			for (i=1; i<SIZE; i+=SUBSIZE+1) {
+				for (j=1; j<SIZE; j+=SUBSIZE+1) {
+					Subset_init() ;
+					CheckSS(i,j,pFS) ;
+					if ( Subset_test( &retest ) ) {
+						return 1 ;
+					}
+				}
+			}
 		}
 		
-		Subset_init() ;
-		CheckD2( pFS ) ;
-		if ( Subset_test() ) {
-			return 1 ;
+		for (j=0 ; j<SIZE ; ++j ) {
+			Subset_init() ;
+			CheckC( j, pFS ) ; 
+			if ( Subset_test( &retest ) ) {
+				return 1 ;
+			}
 		}
-	}
+		
+		if ( Xpattern ) {
+			Subset_init() ;
+			CheckD1( pFS ) ;
+			if ( Subset_test( &retest ) ) {
+				return 1 ;
+			}
+			
+			Subset_init() ;
+			CheckD2( pFS ) ;
+			if ( Subset_test( &retest ) ) {
+				return 1 ;
+			}
+		}
+	} while ( retest ) ;
 	
 	return 0 ;
 }
@@ -643,7 +657,7 @@ struct FillState * SolveLoopUntimed2( struct FillState * pFS ) {
 	return pFS ;
 }
 
-struct FillState * Setup_board( int * preset ) {
+struct FillState * Setup_board( int X, int Window, int debug, int * preset ) {
 	// preset is an array of TOTALSIZE length
 	// sent from python
 	// only values on (0 -- SIZE-1) accepted
@@ -654,7 +668,10 @@ struct FillState * Setup_board( int * preset ) {
 	int * set = preset ; // pointer though preset array
 	struct FillState * pFS ;
 	
-	//printf("LIB\n") ;
+	Xpattern = X ;
+	Wpattern = Window ;
+	Debug = debug ;
+
 	make_pattern() ; // set up bit pattern list
 	pFS = StateStackInit( preset ) ; // needs make_pattern
 	
@@ -734,14 +751,11 @@ int Resume( void ) {
 	
 // return 1=solved, 0 not. data in same array
 int Solve( int X, int Window, int debug, int * preset ) {
-	struct FillState * pFS = Setup_board( preset ) ;
+	struct FillState * pFS = Setup_board( X, Window, debug, preset ) ;
 	
 	signal( SIGINT, RuptHandler ) ;
 	pFS_interrupted = NULL ;
 
-	Xpattern = X ;
-	Wpattern = Window ;
-	Debug = debug ;
 	ReDoCount = 0 ;
 	
 	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
@@ -757,9 +771,30 @@ int Solve( int X, int Window, int debug, int * preset ) {
 	
 // return 1=ok, 0 not. data in same array
 int Test( int X, int Window, int debug, int * preset ) {
-	struct FillState * pFS = Setup_board( preset ) ;
+	struct FillState * pFS = Setup_board( X, Window, debug, preset ) ;
 	
 	return pFS != NULL ;
+}
+
+// list of available choices at testi, testj
+void TestAvailable( int X, int Window, int debug, int testi, int testj, int * preset, int * return_list ) {
+	struct FillState * pFS = Setup_board( X, Window, debug, preset ) ;
+	
+	int i ;
+	// set up return list as empty first
+	for ( i=0 ; i<SIZE ; ++i ) {
+		return_list[i] = 0 ;
+	}
+	
+	if ( pFS ) {
+		int bits = pFS->mask_bits[testi][testj] ;
+		for ( i=0 ; i<SIZE ; ++i ) {
+			int pos = i+1 ; //1-based values
+			if ( bits & pattern[pos] ) {
+				return_list[i] = pos ;
+			}
+		}
+	}
 }
 
 // Is there:
@@ -769,14 +804,11 @@ int Test( int X, int Window, int debug, int * preset ) {
 //
 // Does NOT show solution
 int TestUnique( int X, int Window, int debug, int * preset ) {
-	struct FillState * pFS = Setup_board( preset ) ;
+	struct FillState * pFS = Setup_board( X, Window, debug, preset ) ;
 	
 	signal( SIGINT, RuptHandler ) ;
 	pFS_interrupted = NULL ;
 
-	Xpattern = X ;
-	Wpattern = Window ;
-	Debug = debug ;
 	ReDoCount = 0 ;
 	
 	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;

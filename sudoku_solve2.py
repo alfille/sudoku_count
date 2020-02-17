@@ -23,6 +23,7 @@ class Persist(tk.Frame):
 	s_lib={}
 	Lib={}
 	mode = "normal"
+	Legal=True
 	
 	@classmethod
 	def LibSet(cls):		
@@ -63,18 +64,11 @@ class Sudoku(tk.Frame):
 		self.SIZE = Persist.SUBSIZE * Persist.SUBSIZE
 		self.TOTALSIZE = self.SIZE * self.SIZE
 		self.master = master
-		self.font = tkfont.Font(weight="bold",size=Persist.Fsize)
-		#self.pack()
-
-		self.X = tk.BooleanVar()
-		self.X.set(Persist.X)
-		self.Window = tk.BooleanVar()
-		self.Window.set(Persist.Window)
-		self.Debug = tk.BooleanVar()
-		self.Debug.set(Persist.Debug)
-
-		self.create_widgets()
-		self.create_menu()
+		
+		self.option_setup()
+		
+		self.Widget()
+		self.Menu()
 		if ( Persist.Data ):
 			self.SetData()
 		else:
@@ -102,18 +96,30 @@ class Sudoku(tk.Frame):
 
 	def set_square(self,i,j,n):
 		self.but[i][j].configure(text=n)
-		self.sq_popup_done( i , j )
+		self.popup_done( i , j )
 		self.UnRed()
 		
-	def sq_popup_done( self, i, j ):
+	def popup_done( self, i, j ):
 		self.pop.destroy()
 		self.but[i][j].configure(relief="raised")
 		self.status.configure(text="Edit mode")
 			
+	def popup_force_done( self, i, j, force ):
+		self.pop.destroy()
+		self.but[i][j].configure(relief="raised")
+		self.status.configure(text="Edit mode")
+		self.Popup(i,j,not force)
 	
-	def sq_popup( self,i,j):
+	def Popup( self,i,j,force):
 		self.but[i][j].configure(relief="sunken")
 		self.pop=tk.Toplevel()
+		
+		show = False
+		if Persist.Legal:
+			goodlist = self.Available(i,j)
+		else:
+			goodlist = [x+1 for x in range(self.SIZE)]
+		t = [0 for n in range(self.SIZE+1)]
 		
 		# figure location
 		self.win.update()
@@ -130,9 +136,15 @@ class Sudoku(tk.Frame):
 		for si in range(Persist.SUBSIZE):
 			for sj in range(Persist.SUBSIZE):
 				n = si*Persist.SUBSIZE+sj+1				
-				tk.Button(self.pop,text=str(n),borderwidth=3,height=1,width=1,font=self.font,command=lambda i=i,j=j,n=str(n): self.set_square(i,j,n)).grid(row=si,column=sj)
-		tk.Button(self.pop,text="Clear",borderwidth=3,height=2,font=self.font,command=lambda i=i,j=j,n=" ": self.set_square(i,j,n)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
-		tk.Button(self.pop,text="Back",borderwidth=3,height=2,font=self.font,command=lambda i=i,j=j: self.sq_popup_done(i,j)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
+				t[n]=tk.Button(self.pop,text=str(n),borderwidth=3,height=1,width=1,font=self.font, state='normal' if (n in goodlist) or not force else 'disabled', command=lambda i=i,j=j,n=str(n): self.set_square(i,j,n))
+				t[n].grid(row=si+1,column=sj)
+
+		if 0 in goodlist:
+			tk.Button(self.pop,text="force" if force else "unforce",borderwidth=3,height=1,font=self.font,command=lambda i=i,j=j: self.popup_force_done(i,j,force)).grid(row=0,columnspan=Persist.SUBSIZE,sticky="EW")
+
+		tk.Button(self.pop,text="Clear",borderwidth=3,height=1,font=self.font,command=lambda i=i,j=j,n=" ": self.set_square(i,j,n)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
+		tk.Button(self.pop,text="Back",borderwidth=3,height=1,font=self.font,command=lambda i=i,j=j: self.popup_done(i,j)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
+
 		self.pop.grab_set()
 
 	def Clear(self):
@@ -207,6 +219,29 @@ class Sudoku(tk.Frame):
 		if not self.just_test():
 			tkmessage.showinfo("Position test","Not valid")
 
+	def Available(self,testi,testj):
+		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
+		ret = (ctypes.c_int * self.SIZE)(-1)
+		k = 0
+		for i in range(self.SIZE):
+			for j in range(self.SIZE):
+				t = self.but[i][j].cget('text')
+				if i==testi and j==testj: # blank tested location
+					arr[k] = 0
+				elif t != " ":
+					arr[k] = int(t) # 1-based values for squares
+					self.but[i][j].configure(fg="red")
+				else:
+					arr[k] = 0
+				k += 1
+
+		x = 1 if Persist.X else 0
+		w = 1 if Persist.Window else 0
+		d = 1 if Persist.Debug else 0
+
+		Persist.solve_lib.TestAvailable(x,w,d,testi, testj, arr,ret)
+		return ret
+	
 	def just_test(self):
 		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
 		k = 0
@@ -230,7 +265,7 @@ class Sudoku(tk.Frame):
 		sys.exit()
 		self.master.quit()
 	
-	def create_widgets(self):
+	def Widget(self):
 		self.win = tk.Frame(self.master,borderwidth=2,relief="flat",background="white")
 		self.win.pack(side="top")
 		self.buttons=tk.Frame(self.master,borderwidth=2,relief="flat",background="white")
@@ -253,7 +288,7 @@ class Sudoku(tk.Frame):
 					for ssj in range(Persist.SUBSIZE):
 						i = si*Persist.SUBSIZE+ssi
 						j = sj*Persist.SUBSIZE+ssj
-						self.but[i][j] = tk.Button(f,text=" ",borderwidth=3,height=1,width=1,font=self.font,command=lambda i=i,j=j: self.sq_popup(i,j))
+						self.but[i][j] = tk.Button(f,text=" ",borderwidth=3,height=1,width=1,font=self.font,command=lambda i=i,j=j: self.Popup(i,j,True))
 						self.but[i][j].grid(row=ssi, column=ssj)
 						if Persist.X and ((i==j) or (i == self.SIZE-j-1)):
 							self.but[i][j].configure(background="light yellow")
@@ -272,11 +307,11 @@ class Sudoku(tk.Frame):
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
 				self.but[i][j].configure(fg='black')
-				s = int(Persist.Data[i][j])
-				if s == "0":
-					s = " "
+				s = str(Persist.Data[i][j])
+				if s == '0':
+					s = ' '
 				self.but[i][j].configure(text=s) # 1-based text values
-
+		Persist.Data = None
 			
 	def about(self):
 		print("Sudoku Solve by Paul Alfille 2020")
@@ -294,13 +329,31 @@ class Sudoku(tk.Frame):
 			Persist.Window = self.Window.get()
 			self.master.destroy()
 		Persist.Debug = self.Debug.get()
+		Persist.Legal = self.Legal.get()
 
+	def option_setup(self):
+		# match with Option(), set in Menu()
+		self.font = tkfont.Font(weight="bold",size=Persist.Fsize)
+		#self.pack()
+
+		self.X = tk.BooleanVar()
+		self.X.set(Persist.X)
+		
+		self.Window = tk.BooleanVar()
+		self.Window.set(Persist.Window)
+		
+		self.Debug = tk.BooleanVar()
+		self.Debug.set(Persist.Debug)
+		
+		self.Legal = tk.BooleanVar()
+		self.Legal.set(Persist.Legal)
+		
 	def fsize( self, f ):
 		if ( f != Persist.Fsize ) :
 			Persist.Fsize = f
 			self.master.destroy()
 
-	def create_menu(self):
+	def Menu(self):
 		self.menu = tk.Menu(self.master,tearoff=0)
 
 		self.filemenu = tk.Menu(self.menu,tearoff=0)
@@ -324,6 +377,7 @@ class Sudoku(tk.Frame):
 		self.optmenu.add_checkbutton(label="X pattern",onvalue=True,offvalue=False,variable=self.X,font=self.font,command=self.Option)
 		self.optmenu.add_checkbutton(label="Window pane",onvalue=True,offvalue=False,variable=self.Window,font=self.font,command=self.Option)
 		self.optmenu.add_checkbutton(label="Debugging data",onvalue=True,offvalue=False,variable=self.Debug,font=self.font,command=self.Option)
+		self.optmenu.add_checkbutton(label="Legal choices",onvalue=True,offvalue=False,variable=self.Legal,font=self.font,command=self.Option)
 		self.fontmenu = tk.Menu(self.optmenu,tearoff=0)
 		self.optmenu.add_cascade(label="Font size",menu=self.fontmenu,font=self.font)
 		for ff in [6,8,10,14,18,22,26]:
@@ -378,7 +432,7 @@ class Sudoku(tk.Frame):
 						if i == Lsize:
 							#done
 							Persist.X = X
-							Persiste.Window = Window
+							Persist.Window = Window
 							Persist.SUBSIZE = [x*x for x in range(7)].index(Lsize)
 							self.master.destroy()
 				Lfile.close()
