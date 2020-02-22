@@ -18,6 +18,7 @@ class Persist(tk.Frame):
 	Window = False
 	Debug = False
 	Fsize = 14
+	GameStatus="None"
 	Data = None
 	solve_lib = None
 	s_lib={}
@@ -353,6 +354,9 @@ class Sudoku(tk.Frame):
 			Persist.Fsize = f
 			self.master.destroy()
 
+	def set_status( self, s ):
+		Persist.GameStatus = s
+
 	def Menu(self):
 		self.menu = tk.Menu(self.master,tearoff=0)
 
@@ -378,10 +382,16 @@ class Sudoku(tk.Frame):
 		self.optmenu.add_checkbutton(label="Window pane",onvalue=True,offvalue=False,variable=self.Window,font=self.font,command=self.Option)
 		self.optmenu.add_checkbutton(label="Debugging data",onvalue=True,offvalue=False,variable=self.Debug,font=self.font,command=self.Option)
 		self.optmenu.add_checkbutton(label="Legal choices",onvalue=True,offvalue=False,variable=self.Legal,font=self.font,command=self.Option)
+
 		self.fontmenu = tk.Menu(self.optmenu,tearoff=0)
 		self.optmenu.add_cascade(label="Font size",menu=self.fontmenu,font=self.font)
 		for ff in [6,8,10,14,18,22,26]:
-			self.fontmenu.add_command(label=str(ff), font=self.font, command=lambda ff=ff: self.fsize(ff))
+			self.fontmenu.add_command(label=("> " if ff==Persist.Fsize else "")+str(ff),font=self.font, command=lambda ff=ff: self.fsize(ff))
+
+		self.statusmenu = tk.Menu(self.optmenu,tearoff=0)
+		self.optmenu.add_cascade(label="Game state status",menu=self.statusmenu,font=self.font)
+		for ss in ["None","Valid","Solvable","Unique"]:
+			self.statusmenu.add_command(label=("> " if ss==Persist.GameStatus else "")+ss, font=self.font, command=lambda ss=ss: self.set_status(ss))
 
 		self.helpmenu = tk.Menu(self.menu,tearoff=0)
 		self.menu.add_cascade(label="Help",menu=self.helpmenu,font=self.font)
