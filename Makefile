@@ -39,6 +39,7 @@ SQRT_4  := 2
 powers := 4 9 16 25 36
 slibs := $(addsuffix $(lib), $(addprefix sudoku_lib, $(powers)))
 slibs2 := $(addsuffix $(lib), $(addprefix sudoku2_lib, $(powers)))
+slibs3 := $(addsuffix $(lib), $(addprefix sudoku3_lib, $(powers)))
 progs := $(addprefix sudoku_count, $(powers))
 
 $(slibs): sudoku_lib.c $(deps)
@@ -46,6 +47,9 @@ $(slibs): sudoku_lib.c $(deps)
 
 $(slibs2): sudoku2_lib.c $(deps)
 	$(CC) -fPIC -shared -DSUBSIZE=$(SQRT_$(subst sudoku2_lib,,$(basename $@))) -o $@ $< $(CFLAGS)
+
+$(slibs3): sudoku3_lib.c $(deps)
+	$(CC) -fPIC -shared -DSUBSIZE=$(SQRT_$(subst sudoku3_lib,,$(basename $@))) -o $@ $< $(CFLAGS)
 
 $(progs): sudoku_count.c $(RAN)
 	$(CC) -DSUBSIZE=$(SQRT_$(subst sudoku_count,,$(basename $@))) -o $@ $^ $(CFLAGS)
@@ -56,4 +60,4 @@ least_connected: $(OBJLC)
 most_connected: $(OBJMC)
 	$(CC) -o $@ $^ $(CFLAGS)
 
-all: least_connected most_connected $(progs) $(slibs) $(slibs2)
+all: least_connected most_connected $(progs) $(slibs) $(slibs2) $(slibs3)
