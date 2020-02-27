@@ -17,8 +17,25 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <signal.h>
+#include <pthread.h>
 
 time_t next_time ;
+
+// Thread synchronization (signal to thread and back)
+enum solve_state { 
+	solve_setup=0,
+	solve_error=1,
+	solve_invalid=2,
+	solve_valid=3, 
+	solve_working=4, 
+	solve_unsolveable=5, 
+	solve_solveable=6, 
+	solve_unique=7, 
+	solve_multiple=8, 
+} SolveState ;
+pthread_mutex_t ts_lock = PTHREAD_MUTEX_INITIALIZER ;
+pthread_t worker_thread ;
+
 
 // SIZE x SIZE sudoku board
 #ifndef SUBSIZE
@@ -107,7 +124,6 @@ struct FillState * StateStackInit ( int * preset ) {
     return & State[0] ;
 }
 
-
 struct FillState * StateStackPush( void ) {
     if ( statestack.size == 0 ) {
         return & State[0] ;
@@ -131,6 +147,47 @@ struct FillState * StateStackPop( void ) {
         statestack.end = ( statestack.end + statestack.size - 1 ) % statestack.size ; // make sure positive modulo
         return & State[statestack.end] ;
     }
+}
+
+struct FillState * StateStackCurrent( void ) {
+	return & State[statestack.end] ;
+}
+
+void KillThread( void ) {
+	static int threads = 0 ;
+	
+	if ( threads ) {
+		void * res ;
+		switch( pthread_cancel( worker_thread ) )
+		{
+			case ESRCH:
+				fprintf(stderr,"No thread?\n");
+				break ;
+			case 0:
+				switch ( pthread_join(worker_thread, &res ) )
+				{
+					case 0:
+					case ESRCH:
+						break ;
+					default:
+						fprintf(stderr,"Couldn't merge with killed thread\n");
+						exit(1) ;
+				}
+			default:
+				fprintf(stderr,"Couldn't cancel existing thread\n") ;
+				exit(1);
+		}
+	}
+	++threads ;
+}
+
+void StartThread( void * (*func)( void *), struct FillState * pFS ) 
+{
+	SolveState = solve_working ;
+	if ( pthread_create( & worker_thread, NULL, func, pFS ) ) {
+		fprintf( stderr, "Couldn't create the thread\n" ) ;
+		exit(1) ;
+	}
 }
 
 struct Subsets {
@@ -668,6 +725,9 @@ struct FillState * Setup_board( int X, int Window, int debug, int * preset ) {
 	int * set = preset ; // pointer though preset array
 	struct FillState * pFS ;
 	
+	KillThread() ;
+	SolveState = solve_setup ;
+	
 	Xpattern = X ;
 	Wpattern = Window ;
 	Debug = debug ;
@@ -683,16 +743,19 @@ struct FillState * Setup_board( int X, int Window, int debug, int * preset ) {
 				pFS = Set_Square( pFS, i, j ) ;
 				if ( pFS == NULL ) {
 					// bad input (inconsistent)
+					SolveState = solve_invalid ;
 					return NULL ;
 				}
 			} else if ( v != 0 ) {
 				fprintf( stderr,"Input value out of range: %d\n",v);
+				SolveState = solve_error ;
 				return NULL ;
 			}
 			++set ; // move to next entry
 		}
 	}
 	//printf("PostLIB\n") ;
+	SolveState = solve_valid ;
 	return pFS ;
 }
 

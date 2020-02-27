@@ -36,7 +36,7 @@ class Persist(tk.Frame):
 		if not cls.Lib[cls.SUBSIZE]:
 			# Shared C library
 			lib_base = "./" #location
-			lib_base += "sudoku2_lib" # base name
+			lib_base += "sudoku3_lib" # base name
 			
 			lib_base += str(cls.SUBSIZE*cls.SUBSIZE)	
 
@@ -155,6 +155,7 @@ class Sudoku(tk.Frame):
 		self.pop.grab_set()
 
 	def Clear(self):
+		sol = Persist.solve_lib.ThreadTest()
 		self.status.configure(text="Clearing...")
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
@@ -495,7 +496,7 @@ def Libs():
 	for ss in range(2,7):
 		# Shared C library
 		lib_base = "./" #location
-		lib_base += "sudoku2_lib" # base name
+		lib_base += "sudoku3_lib" # base name
 		
 		lib_base += str(ss*ss)	
 

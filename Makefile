@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-I.
+CFLAGS=-I. -Wall
 DEPS = sudoku_count.h
 OBJ = sudoku_count.o xoshiro256starstar.o
 RAN = xoshiro256starstar.o
@@ -52,7 +52,7 @@ $(slibs3): sudoku3_lib.c $(deps)
 	$(CC) -fPIC -shared -DSUBSIZE=$(SQRT_$(subst sudoku3_lib,,$(basename $@))) -o $@ $< $(CFLAGS)
 
 $(progs): sudoku_count.c $(RAN)
-	$(CC) -DSUBSIZE=$(SQRT_$(subst sudoku_count,,$(basename $@))) -o $@ $^ $(CFLAGS)
+	$(CC) -DSUBSIZE=$(SQRT_$(subst sudoku_count,,$(basename $@))) -lpthread -o $@ $^ $(CFLAGS)
 
 least_connected: $(OBJLC)
 	$(CC) -o $@ $^ $(CFLAGS)
