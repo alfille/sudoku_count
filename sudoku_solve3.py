@@ -7,6 +7,7 @@ import argparse
 import ctypes
 import platform
 import signal
+from copy import deepcopy
 
 def signal_handler(signal, frame):
     print("\nForced end\n")
@@ -59,6 +60,7 @@ class Persist(tk.Frame):
 class Sudoku(tk.Frame):
 	color=["dark blue","yellow"]
 	solution = False
+	after = None
 	
 	def __init__(self, master=None):
 		super().__init__(master)
@@ -99,17 +101,17 @@ class Sudoku(tk.Frame):
 		self.but[i][j].configure(text=n)
 		self.popup_done( i , j )
 		self.UnRed()
+		self.SetBoard()
 		
 	def popup_done( self, i, j ):
 		self.pop.destroy()
 		self.but[i][j].configure(relief="raised")
 		self.Status()
 		
-	def Status( self ):
-		self.status.configure(text="Edit mode")
-		if ( Persist.GameStatus == "Unique" ):
-			self.status.configure( text=["Unsolvable","Unique","Not unique"][self.Unique()] )
-		
+	def Status( self, stat = None ):
+		if not stat:
+			stat = Persist.solve_lib.GetStatus()
+		self.status.configure( text=["Setup","Error","Illegal","Legal","Working","Unsolvable","Solvable","Unique","Not unique"][stat] )		
 			
 	def popup_force_done( self, i, j, force ):
 		self.pop.destroy()
@@ -155,20 +157,17 @@ class Sudoku(tk.Frame):
 		self.pop.grab_set()
 
 	def Clear(self):
-		sol = Persist.solve_lib.ThreadTest()
 		self.status.configure(text="Clearing...")
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
 				self.but[i][j].configure(text=" ")
 		self.Status()
 		self.UnRed()
+		self.SetBoard()
 				
-	def Solve(self):
-		self.status.configure(text="Solving...")
-		self.master.update()
+	def SetBoard(self): # set library representation
 		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
 		k = 0
-		self.solution = True
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
 				arr[k] = -1 # default blank
@@ -183,71 +182,43 @@ class Sudoku(tk.Frame):
 		x = 1 if Persist.X else 0
 		w = 1 if Persist.Window else 0
 		d = 1 if Persist.Debug else 0
-
-		sol = Persist.solve_lib.Solve(x,w,d,arr)
-		while True:
-			if sol == 0:
-				self.status.configure(text="Not solvable")
-				for i in range(self.SIZE):
-					for j in range(self.SIZE):
-						if self.but[i][j].cget('fg') != 'red':
-							self.but[i][j].configure(text=" ")
-				self.master.update()
-				break
-			if sol == 1:
-				self.status.configure(text="Successfully solved")
-				k = 0
-				for i in range(self.SIZE):
-					for j in range(self.SIZE):
-						if arr[k] > 0 :
-							self.but[i][j].configure(text=str(arr[k])) # 1-based text values
-							if self.but[i][j].cget('fg') == 'blue':
-								self.but[i][j].configure(fg='black')
-						else:
-							self.but[i][j].configure(text=" ")
-						k += 1
-				self.master.update()
-				break
-			if sol < 0:
-				self.status.configure(text="<"+str(-sol)+">  Still solving...")
-				k = 0
-				for i in range(self.SIZE):
-					for j in range(self.SIZE):
-						if self.but[i][j].cget('fg') != 'red':
-							self.but[i][j].configure(fg='blue')
-						if arr[k] > 0 :
-							self.but[i][j].configure(text=str(arr[k])) # 1-based text values
-						else:
-							self.but[i][j].configure(text=" ")
-						k += 1
+		if self.after:
+			self.master.after_cancel(self.after)
+		self.Status( stat = Persist.solve_lib.SetBoard(x,w,d,arr) )
+	
+	def GetBoard(self):
+		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
+		sol = Persist.solve_lib.GetBoard(arr)
+		k = 0
+		for i in range(self.SIZE):
+			for j in range(self.SIZE):
+				if self.but[i][j].cget('fg') != 'red':
+					self.but[i][j].configure(fg='blue')
+				if arr[k] > 0 :
+					self.but[i][j].configure(text=str(arr[k])) # 1-based text values
+				else:
+					self.but[i][j].configure(text=" ")
+				k += 1
 			self.master.update()
-			sol = Persist.solve_lib.Resume()
+		self.Status( stat= sol )
+		return sol
+
+	def solving( self ):
+		stat = self.GetBoard()
+		if stat in [ 4 ]:
+			self.after = self.master.after(500,self.solving)
+
+	def Solve(self):
+		self.Status(stat=Persist.solve_lib.Solve())
+		self.after = self.master.after( 500, self.solving )		
 
 	def Test( self ):
 		if not self.just_test():
 			tkmessage.showinfo("Position test","Not valid")
 
 	def Available(self,testi,testj):
-		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
 		ret = (ctypes.c_int * self.SIZE)(-1)
-		k = 0
-		for i in range(self.SIZE):
-			for j in range(self.SIZE):
-				t = self.but[i][j].cget('text')
-				if i==testi and j==testj: # blank tested location
-					arr[k] = 0
-				elif t != " ":
-					arr[k] = int(t) # 1-based values for squares
-					self.but[i][j].configure(fg="red")
-				else:
-					arr[k] = 0
-				k += 1
-
-		x = 1 if Persist.X else 0
-		w = 1 if Persist.Window else 0
-		d = 1 if Persist.Debug else 0
-
-		Persist.solve_lib.TestAvailable(x,w,d,testi, testj, arr,ret)
+		self.Status(stat=Persist.solve_lib.GetAvailable(testi,testj,ret))
 		return ret
 		
 	def Unique(self):
@@ -323,12 +294,12 @@ class Sudoku(tk.Frame):
 								self.but[i][j].configure(background="aquamarine")
 								if Persist.X and ((i==j) or (i == self.SIZE-j-1)):
 									self.but[i][j].configure(background="pale green")
-		self.Status()
 								
 	def BadData( self ):
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
 				self.but[i][j].configure(text=str(1+(i+j)%self.SIZE))
+		self.SetBoard()
 
 	def SetData( self ):
 		for i in range(self.SIZE):
@@ -339,6 +310,7 @@ class Sudoku(tk.Frame):
 					s = ' '
 				self.but[i][j].configure(text=s) # 1-based text values
 		Persist.Data = None
+		self.SetBoard()
 			
 	def about(self):
 		print("Sudoku Solve by Paul Alfille 2020")

@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -18,8 +17,6 @@
 #include <inttypes.h>
 #include <signal.h>
 #include <pthread.h>
-
-time_t next_time ;
 
 // Thread synchronization (signal to thread and back)
 enum solve_state { 
@@ -33,9 +30,10 @@ enum solve_state {
 	solve_unique=7, 
 	solve_multiple=8, 
 } SolveState ;
-pthread_mutex_t ts_lock = PTHREAD_MUTEX_INITIALIZER ;
-pthread_t worker_thread ;
 
+pthread_mutex_t solvestate_lock = PTHREAD_MUTEX_INITIALIZER ;
+
+pthread_t worker_thread ;
 
 // SIZE x SIZE sudoku board
 #ifndef SUBSIZE
@@ -54,7 +52,6 @@ void RuptHandler( int sig ) {
 static int Xpattern ;
 static int Wpattern ;
 static int Debug ;
-static int ReDoCount ;
 
 // bit pattern
 static int pattern[SIZE+1] ;
@@ -96,11 +93,8 @@ int reverse_pattern( int pat ) {
 struct FillState {
     int mask_bits[SIZE][SIZE] ; // bits unavailable
     int value[SIZE][SIZE] ; // solution (<=0) or number of available solutions
-    int * preset ;
     int done ;
 } State[MAXTRACK] ;
-
-static struct FillState * pFS_interrupted = NULL ;
 
 struct StateStack {
     int size ;
@@ -108,7 +102,7 @@ struct StateStack {
     int end ;
 } statestack = { 0,0,0 };
 
-struct FillState * StateStackInit ( int * preset ) {
+struct FillState * StateStackInit ( void ) {
 	int i,j ;
     statestack.size = TOTALSIZE ;
     statestack.start = statestack.end = 0 ;
@@ -119,12 +113,14 @@ struct FillState * StateStackInit ( int * preset ) {
 		}
 	}
 	State[0].done = 0 ;
-	State[0].preset = preset ;
 	
     return & State[0] ;
 }
 
 struct FillState * StateStackPush( void ) {
+	if ( Debug ) {
+		printf("Push");
+	}
     if ( statestack.size == 0 ) {
         return & State[0] ;
     } else {
@@ -140,6 +136,9 @@ struct FillState * StateStackPush( void ) {
 }
 
 struct FillState * StateStackPop( void ) {
+	if ( Debug ) {
+		printf("Pop");
+	}
     if ( statestack.start == statestack.end ) {
         // empty
         return NULL ;
@@ -181,10 +180,10 @@ void KillThread( void ) {
 	++threads ;
 }
 
-void StartThread( void * (*func)( void *), struct FillState * pFS ) 
+void StartThread( void * (*func)( void *) ) 
 {
 	SolveState = solve_working ;
-	if ( pthread_create( & worker_thread, NULL, func, pFS ) ) {
+	if ( pthread_create( & worker_thread, NULL, func, NULL ) ) {
 		fprintf( stderr, "Couldn't create the thread\n" ) ;
 		exit(1) ;
 	}
@@ -484,9 +483,6 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 		
 		// Push state (with current choice masked out) if more than one choice
 		if ( pFS->mask_bits[testi][testj] ) {
-			if ( Debug ) {
-				printf("Push");
-			}
 			pFS = StateStackPush() ;
 		}
 		// Now set this choice
@@ -648,69 +644,71 @@ struct FillState * Next_move( struct FillState * pFS ) {
 	return Set_Square( pFS, fi, fj ) ;
 }
 
-struct FillState * SolveLoop( struct FillState * pFS ) {	
-	time_t next = time(NULL) + 6 ; // every minute +
+void * SolveLoop( void * v ) {	
+	struct FillState * pFS = StateStackCurrent() ;
 	while ( pFS && pFS->done == 0 ) {
 		//printf("Solveloop\n");
 		pFS = Next_move( pFS ) ;
 		if ( (pFS == NULL) || CheckAvailable( pFS ) ) {
-			if ( Debug ) {
-				printf("Pop");
-			}
 			pFS = StateStackPop() ;
-			if ( next < time(NULL) ) {
-				// Interrupt for time -- can resume
-				return pFS ;
-			}
 		}
 	}
 	//print_square( pFS ) ;
+	pthread_mutex_lock( &solvestate_lock ) ;
+	SolveState = pFS==NULL ? solve_unsolveable : solve_solveable ;
+	pthread_mutex_unlock( &solvestate_lock ) ;
+	
 	return pFS ;
 }
 
-// For TestUnique -- no pause/resume
-// Find first solution
-struct FillState * SolveLoopUntimed1( struct FillState * pFS ) {	
+struct FillState * SolveLoop1( struct FillState * pFS ) {	
 	while ( pFS && pFS->done == 0 ) {
-		//printf("Solveloop\n");
 		pFS = Next_move( pFS ) ;
 		if ( (pFS == NULL) || CheckAvailable( pFS ) ) {
-			if ( Debug ) {
-				printf("Pop");
-			}
 			pFS = StateStackPop() ;
 		}
 	}
-	//print_square( pFS ) ;
+
 	return pFS ;
 }
 
 // For TestUnique -- no pause/resume
 // Find second solution
 // Assumes pFS not NULL initially
-struct FillState * SolveLoopUntimed2( struct FillState * pFS ) {
-	if ( Debug ) {
-		printf("\nLook for second solution:");
-	}
-	pFS = StateStackPop() ; // Go back to prior
-	if ( Debug ) {
-		printf("Pop");
-	}
+struct FillState * SolveLoop2( void ) {
+	struct FillState * pFS = StateStackPop() ; // Go back to prior
 	if (pFS == NULL ) {
-		return pFS ;
+		return NULL ;
 	}
 	pFS->done = 0 ; // Look again
 	while ( pFS && pFS->done == 0 ) {
 		//printf("Solveloop\n");
 		pFS = Next_move( pFS ) ;
 		if ( (pFS == NULL) || CheckAvailable( pFS ) ) {
-			if ( Debug ) {
-				printf("Pop");
-			}
 			pFS = StateStackPop() ;
 		}
 	}
-	//print_square( pFS ) ;
+
+	return pFS ;
+}
+
+void * SolveLoopU( void * v ) {	
+	struct FillState * pFS = StateStackCurrent() ;
+	
+	pFS = SolveLoop1( pFS ) ;
+
+	pthread_mutex_lock( &solvestate_lock ) ;
+	SolveState = pFS==NULL ? solve_unsolveable : solve_solveable ;
+	pthread_mutex_unlock( &solvestate_lock ) ;
+
+	if ( pFS ) {
+		pFS = SolveLoop2() ;
+		
+		pthread_mutex_lock( &solvestate_lock ) ;
+		SolveState = pFS==NULL ? solve_unique : solve_multiple ;
+		pthread_mutex_unlock( &solvestate_lock ) ;
+	}
+	
 	return pFS ;
 }
 
@@ -733,7 +731,7 @@ struct FillState * Setup_board( int X, int Window, int debug, int * preset ) {
 	Debug = debug ;
 
 	make_pattern() ; // set up bit pattern list
-	pFS = StateStackInit( preset ) ; // needs make_pattern
+	pFS = StateStackInit() ; // needs make_pattern
 	
 	for ( i=0 ; i<SIZE ; ++i ) {
 		for ( j=0 ; j<SIZE ; ++j ) {
@@ -759,89 +757,31 @@ struct FillState * Setup_board( int X, int Window, int debug, int * preset ) {
 	return pFS ;
 }
 
-int Return_board( struct FillState * pFS ) {
+int GetStatus( void ) {
+	int r ;
+	pthread_mutex_lock( & solvestate_lock ) ;
+	r = (int) SolveState ;
+	pthread_mutex_unlock( & solvestate_lock ) ;
+	return r ;
+}
+
+int GetBoard( int * set ) {
+	struct FillState * pFS = StateStackCurrent() ;
+	
 	if ( pFS ) {
 		int i, j ;
-		int * set ; // pointer though preset array
-		// solved
-		//printf("Return\n");
-		set = pFS->preset ;
 		for ( i=0 ; i<SIZE ; ++i ) {
 			for ( j=0 ; j<SIZE ; ++j ) {
 				set[0] = pFS->value[i][j] ; 
 				++set ; // move to next entry
 			}
 		}
-		if ( pFS->done ) {
-			// solved
-			if ( Debug ) {
-				printf(" :)\n");
-			}
-			pFS_interrupted = NULL ;
-			return 1 ;
-		} else {
-			// interrupted -- want to resume
-			if ( Debug ) {
-				printf(" :0\n");
-			}
-			pFS_interrupted = pFS ;
-			return --ReDoCount ;
-		}
-	} else {
-		if (Debug) {
-			printf(" :(\n");
-		}
-		// unsolvable
-		return 0 ;
 	}
+	return GetStatus() ;
 }
 	
-int Resume( void ) {
-
-	// resume processing -- all data alreay statically set by prior call to Solve
-	struct FillState * pFS = pFS_interrupted ;
-	
-	pFS_interrupted = NULL ; // clear prior
-
-	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
-	if ( pFS ) {
-		return Return_board( SolveLoop( pFS ) ) ;
-	} else {
-		// bad input (inconsistent soduku)
-		return Return_board( NULL ) ;
-	}
-}
-	
-// return 1=solved, 0 not. data in same array
-int Solve( int X, int Window, int debug, int * preset ) {
-	struct FillState * pFS = Setup_board( X, Window, debug, preset ) ;
-	
-	signal( SIGINT, RuptHandler ) ;
-	pFS_interrupted = NULL ;
-
-	ReDoCount = 0 ;
-	
-	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
-	//printf("V2\n");
-	
-	if ( pFS ) {
-		return Return_board( SolveLoop( pFS ) ) ;
-	} else {
-		// bad input (inconsistent soduku)
-		return Return_board( NULL ) ;
-	}
-}
-	
-// return 1=ok, 0 not. data in same array
-int Test( int X, int Window, int debug, int * preset ) {
-	struct FillState * pFS = Setup_board( X, Window, debug, preset ) ;
-	
-	return pFS != NULL ;
-}
-
-// list of available choices at testi, testj
-void TestAvailable( int X, int Window, int debug, int testi, int testj, int * preset, int * return_list ) {
-	struct FillState * pFS = Setup_board( X, Window, debug, preset ) ;
+int GetAvailable( int testi, int testj, int * return_list ) {
+	struct FillState * pFS = StateStackCurrent() ;
 	
 	int i ;
 	// set up return list as empty first
@@ -858,41 +798,40 @@ void TestAvailable( int X, int Window, int debug, int testi, int testj, int * pr
 			}
 		}
 	}
+	return GetStatus() ;
 }
 
-// Is there:
-//	0 no solution
-//	1 unique solution
-//	2 1+ solutions
-//
-// Does NOT show solution
-int TestUnique( int X, int Window, int debug, int * preset ) {
-	struct FillState * pFS = Setup_board( X, Window, debug, preset ) ;
+int Solve( void ) {
+	switch (SolveState) {
+		case solve_error:
+		case solve_invalid:
+		case solve_unsolveable:
+			break ;
+		default:
+			StartThread( SolveLoop ) ;
+			break ;
+	}
+	return GetStatus() ;
+}
+	
+int GetUnique( void ) {
+	switch (SolveState) {
+		case solve_error:
+		case solve_invalid:
+		case solve_unsolveable:
+			break ;
+		default:
+			StartThread( SolveLoopU ) ;
+			break ;
+	}
+	return GetStatus() ;
+}
+
+int SetBoard( int X, int Window, int debug, int * preset ) {
+	
+	Setup_board( X, Window, debug, preset ) ;
 	
 	signal( SIGINT, RuptHandler ) ;
-	pFS_interrupted = NULL ;
 
-	ReDoCount = 0 ;
-	
-	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
-	//printf("V2\n");
-	
-	if ( pFS == NULL ) {
-		// inconsistent setup
-		return 0 ;
-	}
-	
-	pFS = SolveLoopUntimed1( pFS ) ;
-	if ( pFS==NULL ) {
-		// No solution
-		return 0 ;
-	}
-	
-	pFS = SolveLoopUntimed2( pFS ) ;
-	if ( pFS==NULL ) {
-		// No 2nd solution
-		return 1 ;
-	}
-	
-	return 2 ;
+	return GetStatus() ;
 }
