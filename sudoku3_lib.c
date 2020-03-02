@@ -49,6 +49,7 @@ void RuptHandler( int sig ) {
 }
 
 // Special
+int * preset = NULL ;
 static int Xpattern ;
 static int Wpattern ;
 static int Debug ;
@@ -95,6 +96,8 @@ struct FillState {
     int value[SIZE][SIZE] ; // solution (<=0) or number of available solutions
     int done ;
 } State[MAXTRACK] ;
+
+struct FillState Available ;
 
 struct StateStack {
     int size ;
@@ -160,7 +163,7 @@ void KillThread( void ) {
 		switch( pthread_cancel( worker_thread ) )
 		{
 			case ESRCH:
-				fprintf(stderr,"No thread?\n");
+				//fprintf(stderr,"No thread?\n");
 				break ;
 			case 0:
 				switch ( pthread_join(worker_thread, &res ) )
@@ -593,6 +596,69 @@ struct FillState * Set_Square( struct FillState * pFS, int testi, int testj ) {
 	return pFS ;
 }
 
+// Enter with current position set in free_state for availability list
+void Set_Square_Available( int val, int testi, int testj ) {
+	int si, sj, k ;
+	int b, antib ;
+
+	// already set (preset from GUI)
+	b = pattern[val] ;
+	// point mask
+	Available.mask_bits[testi][testj] ^= b ;
+
+	antib = full_pattern ^ b ;
+
+	// mask out row everywhere else
+	for( k=0 ; k<SIZE ; ++k ) {
+		// row
+		Available.mask_bits[testi][k] &= antib ;
+	}
+
+	// mask out column everywhere else
+	for( k=0 ; k<SIZE ; ++k ) {
+		// row
+		Available.mask_bits[k][testj] &= antib ;
+	}
+
+	// subsquare
+	for( si=0 ; si<SUBSIZE ; ++si ) {
+		for( sj=0 ; sj<SUBSIZE ; ++sj ) {
+			int i = SUBSIZE * (testi/SUBSIZE) + si ;
+			int j = SUBSIZE * (testj/SUBSIZE) + sj ;
+			// row
+			Available.mask_bits[i][j] &= antib ;
+		}
+	}
+	
+	// Xpattern
+	if ( Xpattern ) {
+		if ( testi==testj ) {
+			for ( k=0 ; k<SIZE ; ++k ) {
+				Available.mask_bits[k][k] &= antib ;
+			}
+		} else if ( testi==SIZE-1-testj ) {
+			for ( k=0 ; k<SIZE ; ++k ) {
+				int l = SIZE - 1 - k ;
+				Available.mask_bits[k][l] &= antib ;
+			}
+		}
+	}
+
+	// Window Pane
+	if ( Wpattern ) {
+		if ( (testi%(SUBSIZE+1))!=0 && (testj%(SUBSIZE+1))!=0 ) {
+			for( si=0 ; si<SUBSIZE ; ++si ) {
+				int i = (testi / (SUBSIZE+1)) * (SUBSIZE+1) + 1 + si ;
+				for( sj=0 ; sj<SUBSIZE ; ++sj ) {
+					int j = (testj / (SUBSIZE+1)) * (SUBSIZE+1) + 1 + sj ;
+					// row
+					Available.mask_bits[i][j] &= antib ;
+				}
+			}
+		}
+	}
+}
+
 struct FillState * Next_move( struct FillState * pFS ) {
 	int i ;
 	int j ;
@@ -712,7 +778,7 @@ void * SolveLoopU( void * v ) {
 	return pFS ;
 }
 
-struct FillState * Setup_board( int X, int Window, int debug, int * preset ) {
+struct FillState * Setup_board( void ) {
 	// preset is an array of TOTALSIZE length
 	// sent from python
 	// only values on (0 -- SIZE-1) accepted
@@ -720,19 +786,33 @@ struct FillState * Setup_board( int X, int Window, int debug, int * preset ) {
 	// so use -1 for enpty cells
 	
 	int i, j ;
-	int * set = preset ; // pointer though preset array
+	int * set ; // pointer though preset array
 	struct FillState * pFS ;
 	
 	KillThread() ;
 	SolveState = solve_setup ;
 	
-	Xpattern = X ;
-	Wpattern = Window ;
-	Debug = debug ;
-
-	make_pattern() ; // set up bit pattern list
 	pFS = StateStackInit() ; // needs make_pattern
+
+	// Single Available
+	set = preset ;
+	for ( i=0 ; i<SIZE ; ++i ) {
+		for ( j=0 ; j<SIZE ; ++j ) {
+			Available.mask_bits[i][j] = full_pattern ;
+		}
+	}	
+	for ( i=0 ; i<SIZE ; ++i ) {
+		for ( j=0 ; j<SIZE ; ++j ) {
+			int v = set[0] ;
+			if ( v > 0 && v <= SIZE ) {
+				Set_Square_Available( v, i, j ) ;
+			}
+			++set ; // move to next entry
+		}
+	}
 	
+	// Standard for search and solve
+	set = preset ;
 	for ( i=0 ; i<SIZE ; ++i ) {
 		for ( j=0 ; j<SIZE ; ++j ) {
 			int v = set[0] ;
@@ -745,7 +825,7 @@ struct FillState * Setup_board( int X, int Window, int debug, int * preset ) {
 					return NULL ;
 				}
 			} else if ( v != 0 ) {
-				fprintf( stderr,"Input value out of range: %d\n",v);
+				fprintf( stderr,"Input value out of range: %d (%d,%d)\n",v,i,j);
 				SolveState = solve_error ;
 				return NULL ;
 			}
@@ -765,9 +845,9 @@ int GetStatus( void ) {
 	return r ;
 }
 
-int GetBoard( int * set ) {
+int GetBoard( void ) {
 	struct FillState * pFS = StateStackCurrent() ;
-	
+	int * set = preset ;
 	if ( pFS ) {
 		int i, j ;
 		for ( i=0 ; i<SIZE ; ++i ) {
@@ -781,23 +861,21 @@ int GetBoard( int * set ) {
 }
 	
 int GetAvailable( int testi, int testj, int * return_list ) {
-	struct FillState * pFS = StateStackCurrent() ;
-	
 	int i ;
+	int bits = Available.mask_bits[testi][testj] ;
+
 	// set up return list as empty first
 	for ( i=0 ; i<SIZE ; ++i ) {
 		return_list[i] = 0 ;
 	}
 	
-	if ( pFS ) {
-		int bits = pFS->mask_bits[testi][testj] ;
-		for ( i=0 ; i<SIZE ; ++i ) {
-			int pos = i+1 ; //1-based values
-			if ( bits & pattern[pos] ) {
-				return_list[i] = pos ;
-			}
+	for ( i=0 ; i<SIZE ; ++i ) {
+		int pos = i+1 ; //1-based values
+		if ( bits & pattern[pos] ) {
+			return_list[i] = pos ;
 		}
 	}
+
 	return GetStatus() ;
 }
 
@@ -827,11 +905,28 @@ int GetUnique( void ) {
 	return GetStatus() ;
 }
 
-int SetBoard( int X, int Window, int debug, int * preset ) {
-	
-	Setup_board( X, Window, debug, preset ) ;
+int Setup( int X, int Window, int debug, int * arr ) {
+	Xpattern = X ;
+	Wpattern = Window ;
+	Debug = debug ;
+	preset = arr ;
+
+	make_pattern() ; // set up bit pattern list
+
+	Setup_board() ;
 	
 	signal( SIGINT, RuptHandler ) ;
 
 	return GetStatus() ;
 }
+
+int SetBoard( void ) {
+	
+	Setup_board() ;
+	
+	signal( SIGINT, RuptHandler ) ;
+
+	return GetStatus() ;
+}
+
+

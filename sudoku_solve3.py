@@ -59,13 +59,16 @@ class Persist(tk.Frame):
 
 class Sudoku(tk.Frame):
 	color=["dark blue","yellow"]
-	solution = False
 	after = None
+	candidate = None
 	
 	def __init__(self, master=None):
 		super().__init__(master)
+
 		self.SIZE = Persist.SUBSIZE * Persist.SUBSIZE
 		self.TOTALSIZE = self.SIZE * self.SIZE
+		self.arr = (ctypes.c_int * self.TOTALSIZE)(-1)
+
 		self.master = master
 		
 		self.option_setup()
@@ -78,6 +81,15 @@ class Sudoku(tk.Frame):
 			self.BadData()
 		self.win.update()
 		self.set_win_sizes()
+		self.Lib()
+		self.SetBoard()
+		
+	def Lib(self): 
+		# library setup
+		x = 1 if Persist.X else 0
+		w = 1 if Persist.Window else 0
+		d = 1 if Persist.Debug else 0
+		Persist.solve_lib.Setup( x,w,d,self.arr )
 
 	def set_win_sizes( self ):
 		# needed for popup
@@ -89,18 +101,16 @@ class Sudoku(tk.Frame):
 		self.winy = self.win.winfo_screenheight()
 		
 	def	UnRed( self ):
-		if self.solution:
-			# need to clear old solution
-			for i in range(self.SIZE):
-				for j in range(self.SIZE):
-					self.but[i][j].configure(fg="black")
-			self.solution = False
+		for i in range(self.SIZE):
+			for j in range(self.SIZE):
+				self.but[i][j].configure(fg="black")
 
 
 	def set_square(self,i,j,n):
-		self.but[i][j].configure(text=n)
+		self.set_array( i, j, n )
+		t = str(n) if n > 0 else " "
+		self.but[i][j].configure(text=t)
 		self.popup_done( i , j )
-		self.UnRed()
 		self.SetBoard()
 		
 	def popup_done( self, i, j ):
@@ -111,7 +121,8 @@ class Sudoku(tk.Frame):
 	def Status( self, stat = None ):
 		if not stat:
 			stat = Persist.solve_lib.GetStatus()
-		self.status.configure( text=["Setup","Error","Illegal","Legal","Working","Unsolvable","Solvable","Unique","Not unique"][stat] )		
+		self.status.configure( text=["Setup","Error","Illegal","Legal","Working","Unsolvable","Solvable","Unique","Not unique"][stat] )
+		return stat		
 			
 	def popup_force_done( self, i, j, force ):
 		self.pop.destroy()
@@ -145,13 +156,13 @@ class Sudoku(tk.Frame):
 		for si in range(Persist.SUBSIZE):
 			for sj in range(Persist.SUBSIZE):
 				n = si*Persist.SUBSIZE+sj+1				
-				t[n]=tk.Button(self.pop,text=str(n),borderwidth=3,height=1,width=1,font=self.font, state='normal' if (n in goodlist) or not force else 'disabled', command=lambda i=i,j=j,n=str(n): self.set_square(i,j,n))
+				t[n]=tk.Button(self.pop,text=str(n),borderwidth=3,height=1,width=1,font=self.font, state='normal' if (n in goodlist) or not force else 'disabled', command=lambda i=i,j=j,n=n: self.set_square(i,j,n))
 				t[n].grid(row=si+1,column=sj)
 
 		if 0 in goodlist:
 			tk.Button(self.pop,text="force" if force else "unforce",borderwidth=3,height=1,font=self.font,command=lambda i=i,j=j: self.popup_force_done(i,j,force)).grid(row=0,columnspan=Persist.SUBSIZE,sticky="EW")
 
-		tk.Button(self.pop,text="Clear",borderwidth=3,height=1,font=self.font,command=lambda i=i,j=j,n=" ": self.set_square(i,j,n)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
+		tk.Button(self.pop,text="Clear",borderwidth=3,height=1,font=self.font,command=lambda i=i,j=j,n=0: self.set_square(i,j,n)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
 		tk.Button(self.pop,text="Back",borderwidth=3,height=1,font=self.font,command=lambda i=i,j=j: self.popup_done(i,j)).grid(columnspan=Persist.SUBSIZE,sticky="EW")
 
 		self.pop.grab_set()
@@ -161,60 +172,50 @@ class Sudoku(tk.Frame):
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
 				self.but[i][j].configure(text=" ")
+				self.set_array(i,j,0)
 		self.Status()
-		self.UnRed()
 		self.SetBoard()
 				
 	def SetBoard(self): # set library representation
-		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
-		k = 0
-		for i in range(self.SIZE):
-			for j in range(self.SIZE):
-				arr[k] = -1 # default blank
-				t = self.but[i][j].cget('text')
-				if t != " ":
-					arr[k] = int(t) # 1-based values for squares
-					self.but[i][j].configure(fg="red")
-				else:
-					arr[k] = 0
-				k += 1
+		if self.candidate:
+			self.UnRed()
+		self.candidate = None
 
-		x = 1 if Persist.X else 0
-		w = 1 if Persist.Window else 0
-		d = 1 if Persist.Debug else 0
 		if self.after:
 			self.master.after_cancel(self.after)
-		self.Status( stat = Persist.solve_lib.SetBoard(x,w,d,arr) )
+		self.Status( stat = Persist.solve_lib.SetBoard() )
+		
+	def set_array(self, i, j, val ):
+		self.arr[i*self.SIZE+j] = val
 	
 	def GetBoard(self):
-		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
-		sol = Persist.solve_lib.GetBoard(arr)
+		print("GetBoard-py\n") ;
+		Persist.solve_lib.GetBoard()
 		k = 0
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
-				if self.but[i][j].cget('fg') != 'red':
-					self.but[i][j].configure(fg='blue')
-				if arr[k] > 0 :
-					self.but[i][j].configure(text=str(arr[k])) # 1-based text values
+				c = "black"
+				if self.arr[k] > 0 :
+					if self.candidate and self.candidate[k]>0:
+						c = "red"
+					self.but[i][j].configure(text=str(self.arr[k]),fg=c) # 1-based text values
 				else:
-					self.but[i][j].configure(text=" ")
+					self.but[i][j].configure(text=" ",fg=c)
 				k += 1
 			self.master.update()
-		self.Status( stat= sol )
-		return sol
+		stat = self.Status()
+		return stat
 
 	def solving( self ):
-		stat = self.GetBoard()
-		if stat in [ 4 ]:
+		g = self.GetBoard()
+		print(g," solving...\n")
+		if g in [ 4 ]:
 			self.after = self.master.after(500,self.solving)
 
 	def Solve(self):
+		self.candidate = deepcopy(self.arr)	
 		self.Status(stat=Persist.solve_lib.Solve())
 		self.after = self.master.after( 500, self.solving )		
-
-	def Test( self ):
-		if not self.just_test():
-			tkmessage.showinfo("Position test","Not valid")
 
 	def Available(self,testi,testj):
 		ret = (ctypes.c_int * self.SIZE)(-1)
@@ -222,41 +223,7 @@ class Sudoku(tk.Frame):
 		return ret
 		
 	def Unique(self):
-		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
-		k = 0
-		for i in range(self.SIZE):
-			for j in range(self.SIZE):
-				t = self.but[i][j].cget('text')
-				if t != " ":
-					arr[k] = int(t) # 1-based values for squares
-				else:
-					arr[k] = 0
-				k += 1
-
-		x = 1 if Persist.X else 0
-		w = 1 if Persist.Window else 0
-		d = 1 if Persist.Debug else 0
-
-		return Persist.solve_lib.TestUnique(x,w,d, arr)
-	
-	def just_test(self):
-		arr = (ctypes.c_int * self.TOTALSIZE)(-1)
-		k = 0
-		for i in range(self.SIZE):
-			for j in range(self.SIZE):
-				t = self.but[i][j].cget('text')
-				if t != " ":
-					arr[k] = int(t) # 1-based values for squares
-					self.but[i][j].configure(fg="red")
-				else:
-					arr[k] = 0
-				k += 1
-
-		x = 1 if Persist.X else 0
-		w = 1 if Persist.Window else 0
-		d = 1 if Persist.Debug else 0
-
-		return (Persist.solve_lib.Test(x,w,d,arr)==1)
+		return Persist.solve_lib.TestUnique()
 	
 	def Quit(self):
 		sys.exit()
@@ -285,7 +252,7 @@ class Sudoku(tk.Frame):
 					for ssj in range(Persist.SUBSIZE):
 						i = si*Persist.SUBSIZE+ssi
 						j = sj*Persist.SUBSIZE+ssj
-						self.but[i][j] = tk.Button(f,text=" ",borderwidth=3,height=1,width=1,font=self.font,command=lambda i=i,j=j: self.Popup(i,j,True))
+						self.but[i][j] = tk.Button(f,text=" ",fg='black',borderwidth=3,height=1,width=1,font=self.font,command=lambda i=i,j=j: self.Popup(i,j,True))
 						self.but[i][j].grid(row=ssi, column=ssj)
 						if Persist.X and ((i==j) or (i == self.SIZE-j-1)):
 							self.but[i][j].configure(background="light yellow")
@@ -298,19 +265,19 @@ class Sudoku(tk.Frame):
 	def BadData( self ):
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
-				self.but[i][j].configure(text=str(1+(i+j)%self.SIZE))
-		self.SetBoard()
+				v = 1+(i+j)%self.SIZE
+				self.but[i][j].configure(text=str(v))
+				self.set_array( i, j, v )
 
 	def SetData( self ):
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
-				self.but[i][j].configure(fg='black')
 				s = str(Persist.Data[i][j])
 				if s == '0':
 					s = ' '
 				self.but[i][j].configure(text=s) # 1-based text values
+				self.set_array( i, j, Persist.Data[i][j] )
 		Persist.Data = None
-		self.SetBoard()
 			
 	def about(self):
 		print("Sudoku Solve by Paul Alfille 2020")
@@ -364,7 +331,6 @@ class Sudoku(tk.Frame):
 		self.filemenu.add_command(label="Load",command=self.Load,font=self.font)
 		self.filemenu.add_command(label="Save",command=self.Save,font=self.font)
 		self.filemenu.add_command(label="Solve",command=self.Solve,font=self.font)
-		self.filemenu.add_command(label="Test",command=self.Test,font=self.font)
 		self.filemenu.add_command(label="Clear",command=self.Clear,font=self.font)
 		self.filemenu.add_command(label="Exit",command=self.Quit,font=self.font)
 
