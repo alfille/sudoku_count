@@ -180,7 +180,7 @@ void KillThread( void ) {
 				exit(1);
 		}
 	}
-	++threads ;
+	threads = 1 ;
 }
 
 void StartThread( void * (*func)( void *) ) 
@@ -786,7 +786,7 @@ struct FillState * Setup_board( void ) {
 	// so use -1 for enpty cells
 	
 	int i, j ;
-	int * set ; // pointer though preset array
+	int * set = preset; // pointer though preset array
 	struct FillState * pFS ;
 	
 	KillThread() ;
@@ -794,25 +794,7 @@ struct FillState * Setup_board( void ) {
 	
 	pFS = StateStackInit() ; // needs make_pattern
 
-	// Single Available
-	set = preset ;
-	for ( i=0 ; i<SIZE ; ++i ) {
-		for ( j=0 ; j<SIZE ; ++j ) {
-			Available.mask_bits[i][j] = full_pattern ;
-		}
-	}	
-	for ( i=0 ; i<SIZE ; ++i ) {
-		for ( j=0 ; j<SIZE ; ++j ) {
-			int v = set[0] ;
-			if ( v > 0 && v <= SIZE ) {
-				Set_Square_Available( v, i, j ) ;
-			}
-			++set ; // move to next entry
-		}
-	}
-	
 	// Standard for search and solve
-	set = preset ;
 	for ( i=0 ; i<SIZE ; ++i ) {
 		for ( j=0 ; j<SIZE ; ++j ) {
 			int v = set[0] ;
@@ -861,8 +843,29 @@ int GetBoard( void ) {
 }
 	
 int GetAvailable( int testi, int testj, int * return_list ) {
-	int i ;
-	int bits = Available.mask_bits[testi][testj] ;
+	int i, j ;
+	int * set = preset ; // pointer though preset array
+
+	KillThread() ;
+	SolveState = solve_setup ;
+	
+	// Single Available
+	for ( i=0 ; i<SIZE ; ++i ) {
+		for ( j=0 ; j<SIZE ; ++j ) {
+			Available.mask_bits[i][j] = full_pattern ;
+		}
+	}	
+	for ( i=0 ; i<SIZE ; ++i ) {
+		for ( j=0 ; j<SIZE ; ++j ) {
+			int v = set[0] ;
+			if ( v > 0 && v <= SIZE ) {
+				if ( i!=testi || j!=testj ) {
+					Set_Square_Available( v, i, j ) ;
+				}
+			}
+			++set ; // move to next entry
+		}
+	}
 
 	// set up return list as empty first
 	for ( i=0 ; i<SIZE ; ++i ) {
@@ -871,7 +874,7 @@ int GetAvailable( int testi, int testj, int * return_list ) {
 	
 	for ( i=0 ; i<SIZE ; ++i ) {
 		int pos = i+1 ; //1-based values
-		if ( bits & pattern[pos] ) {
+		if ( Available.mask_bits[testi][testj] & pattern[pos] ) {
 			return_list[i] = pos ;
 		}
 	}
