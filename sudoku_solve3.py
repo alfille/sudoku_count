@@ -7,7 +7,6 @@ import argparse
 import ctypes
 import platform
 import signal
-from copy import deepcopy
 
 def signal_handler(signal, frame):
     print("\nForced end\n")
@@ -189,31 +188,42 @@ class Sudoku(tk.Frame):
 		self.arr[i*self.SIZE+j] = val
 	
 	def GetBoard(self):
-		print("GetBoard-py\n") ;
 		Persist.solve_lib.GetBoard()
 		k = 0
-		for i in range(self.SIZE):
-			for j in range(self.SIZE):
-				c = "black"
-				if self.arr[k] > 0 :
-					if self.candidate and self.candidate[k]>0:
-						c = "red"
-					self.but[i][j].configure(text=str(self.arr[k]),fg=c) # 1-based text values
-				else:
-					self.but[i][j].configure(text=" ",fg=c)
-				k += 1
+		if self.candidate:
+			for i in range(self.SIZE):
+				for j in range(self.SIZE):
+					if self.arr[k] > 0 :
+						if self.candidate[k]>0:
+							self.but[i][j].configure(text=str(self.arr[k]),fg='red') # 1-based text values
+						elif self.lastboard[k] != self.arr[k]:
+							self.but[i][j].configure(text=str(self.arr[k]),fg='black') # 1-based text values
+							self.lastboard[k] = self.arr[k]
+					else:
+						if self.lastboard[k] != 0:
+							self.but[i][j].configure(text=" ")
+							self.lastboard[k] = 0
+					k += 1
+		else:
+			for i in range(self.SIZE):
+				for j in range(self.SIZE):
+					if self.arr[k] > 0 :
+						self.but[i][j].configure(text=str(self.arr[k]),fg='black') # 1-based text values
+					else:
+						self.but[i][j].configure(text=" ",fg='black')
+					k += 1
 			self.master.update()
 		stat = self.Status()
 		return stat
 
 	def solving( self ):
 		g = self.GetBoard()
-		print(g," solving...\n")
 		if g in [ 4 ]:
-			self.after = self.master.after(500,self.solving)
+			self.after = self.master.after(1000,self.solving)
 
 	def Solve(self):
-		self.candidate = deepcopy(self.arr)	
+		self.candidate = self.arr[:]
+		self.lastboard = self.arr[:]
 		self.Status(stat=Persist.solve_lib.Solve())
 		self.after = self.master.after( 500, self.solving )		
 
