@@ -664,15 +664,11 @@ void WS2_order( void ) {
     // Fill columns and rows
     for (k=0;k<SIZE;++k) {
         for (i=k;i<SIZE;++i) {
-            int si = i / SUBSIZE ;
-            int sj = k / SUBSIZE ;
             ++fill ;
             order[fill].i = i ;
             order[fill].j = k ;
         }
         for (j=k+1;j<SIZE;++j) {
-            int si = k / SUBSIZE ;
-            int sj = j / SUBSIZE ;
             ++fill ;
             order[fill].i = k ;
             order[fill].j = j ;

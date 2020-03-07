@@ -129,8 +129,6 @@ void find_next( void ) {
 }
 
 int main(int argc, char ** argv) {
-    int c ; 
-    
 	Zero(order) ;
 	Zero(constraints) ;
 	InitFirst() ;
