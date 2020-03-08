@@ -33,8 +33,7 @@ enum solve_state {
 } SolveState ;
 
 pthread_mutex_t solvestate_lock = PTHREAD_MUTEX_INITIALIZER ;
-
-pthread_t worker_thread ;
+pthread_mutex_t statestack_lock = PTHREAD_MUTEX_INITIALIZER ;
 
 enum ethread { ethread_started , ethread_wounded , ethread_dead } ;
 struct threadlist {
@@ -47,7 +46,7 @@ struct threadlist {
 //pthread_mutex_t threadlist_lock = PTHREAD_MUTEX_INITIALIZER ;
 struct threadlist * threadlist_head = NULL ;
 
-struct threadlist * thread_new( void * (*func)( void *) ) {
+struct threadlist * ThreadlistNew( void * (*func)( void *) ) {
 	struct threadlist * thr = malloc( sizeof( struct threadlist ) ) ;
 	
 	if ( thr ) {
@@ -69,7 +68,7 @@ struct threadlist * thread_new( void * (*func)( void *) ) {
 	return thr ;
 }
 
-void threadlist_kill( void ) {
+void ThreadlistKill( void ) {
 	int i ;
 	
 	for (i=0 ; i<5 ; ++i ) {
@@ -185,15 +184,19 @@ struct StateStack {
 
 struct FillState * StateStackInit ( void ) {
 	int i,j ;
-    statestack.size = TOTALSIZE ;
-    statestack.start = statestack.end = 0 ;
-	for ( i=0 ; i<SIZE ; ++i ) {
-		for ( j=0 ; j<SIZE ; ++j ) {
-			State[0].mask_bits[i][j] = full_pattern ; // all possible
-			State[0].value[i][j] = 0 ; // none set
+
+	statestack.size = TOTALSIZE ;
+    pthread_mutex_lock( & statestack_lock ) ;
+		statestack.start = 0 ;
+		statestack.end = 0 ;
+		for ( i=0 ; i<SIZE ; ++i ) {
+			for ( j=0 ; j<SIZE ; ++j ) {
+				State[0].mask_bits[i][j] = full_pattern ; // all possible
+				State[0].value[i][j] = 0 ; // none set
+			}
 		}
-	}
-	State[0].done = 0 ;
+		State[0].done = 0 ;
+    pthread_mutex_unlock( & statestack_lock ) ;
 	
     return & State[0] ;
 }
@@ -206,13 +209,17 @@ struct FillState * StateStackPush( void ) {
         return & State[0] ;
     } else {
         int oldend = statestack.end ;
-        statestack.end = (statestack.end+1) % statestack.size ;
-        if ( statestack.end == statestack.start ) {
-            // overfilled -- move the start
-            statestack.start = (statestack.start+1) % statestack.size ;
-        }
-        memcpy( & State[statestack.end], & State[oldend], sizeof( struct FillState ) ) ;
-        return & State[statestack.end] ;
+        struct FillState * ret ;
+		pthread_mutex_lock( & statestack_lock ) ;
+			statestack.end = (statestack.end+1) % statestack.size ;
+			if ( statestack.end == statestack.start ) {
+				// overfilled -- move the start
+				statestack.start = (statestack.start+1) % statestack.size ;
+			}
+			memcpy( & State[statestack.end], & State[oldend], sizeof( struct FillState ) ) ;
+			ret = & State[statestack.end] ;
+		pthread_mutex_unlock( & statestack_lock ) ;
+        return ret ;
     }
 }
 
@@ -220,23 +227,32 @@ struct FillState * StateStackPop( void ) {
 	if ( Debug ) {
 		printf("Pop");
 	}
+	pthread_mutex_lock( & statestack_lock ) ;
     if ( statestack.start == statestack.end ) {
         // empty
+		pthread_mutex_unlock( & statestack_lock ) ;
         return NULL ;
     } else {
+        struct FillState * ret ;
         statestack.end = ( statestack.end + statestack.size - 1 ) % statestack.size ; // make sure positive modulo
-        return & State[statestack.end] ;
+		ret = & State[statestack.end] ;
+		pthread_mutex_unlock( & statestack_lock ) ;
+        return ret ;
     }
 }
 
 struct FillState * StateStackCurrent( void ) {
-	return & State[statestack.end] ;
+	struct FillState * ret ;
+	pthread_mutex_lock( & statestack_lock ) ;
+		ret = & State[statestack.end] ;
+	pthread_mutex_unlock( & statestack_lock ) ;
+	return ret ;
 }
 
 void StartThread( void * (*func)( void *) ) 
 {
 	SolveState = solve_working ;
-	thread_new( func ) ;
+	ThreadlistNew( func ) ;
 }
 
 struct Subsets {
@@ -860,7 +876,7 @@ struct FillState * Setup_board( void ) {
 	int * set = preset; // pointer though preset array
 	struct FillState * pFS ;
 	
-	threadlist_kill() ;
+	ThreadlistKill() ;
 	SolveState = solve_setup ;
 	
 	pFS = StateStackInit() ; // needs make_pattern
@@ -918,7 +934,7 @@ int GetAvailable( int testi, int testj, int * return_list ) {
 	int * set = preset ; // pointer though preset array
 
 	//fprintf(stderr,"Avail for %d,%d\n",testi,testj);
-	threadlist_kill() ;
+	ThreadlistKill() ;
 	SolveState = solve_setup ;
 	
 	// Single Available

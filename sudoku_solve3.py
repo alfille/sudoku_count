@@ -33,6 +33,10 @@ class Persist(tk.Frame):
 	
 	@classmethod
 	def LibUse(cls):
+		if cls.solve_lib:
+			# kill any running solver before switching to a new library
+			cls.solve_lib.ThreadlistKill()
+		
 		if not cls.Lib[cls.SUBSIZE]:
 			# Shared C library
 			lib_base = "./" #location
@@ -60,6 +64,7 @@ class Sudoku(tk.Frame):
 	color=["dark blue","yellow"]
 	after = None
 	candidate = None
+	statustext = ""
 	
 	def __init__(self, master=None):
 		super().__init__(master)
@@ -69,6 +74,7 @@ class Sudoku(tk.Frame):
 		self.arr = (ctypes.c_int * self.TOTALSIZE)(-1)
 
 		self.master = master
+		self.master.title("Sudoku")
 		
 		self.option_setup()
 		
@@ -120,7 +126,12 @@ class Sudoku(tk.Frame):
 	def Status( self, stat = None ):
 		if not stat:
 			stat = Persist.solve_lib.GetStatus()
-		self.status.configure( text=["Setup","Error","Illegal","Legal","Working","Unsolvable","Solvable","Unique","Not unique"][stat] )
+		text = ["Setup","Error","Illegal","Legal","Working","Unsolvable","Solvable","Unique","Not unique"][stat]
+		if text != self.statustext:
+			self.statustext = text
+			self.status.configure( text=text )
+			self.master.title(text)
+			self.winfo_toplevel().title(text)
 		return stat		
 			
 	def popup_force_done( self, i, j, force ):
@@ -167,7 +178,6 @@ class Sudoku(tk.Frame):
 		self.pop.grab_set()
 
 	def Clear(self):
-		self.status.configure(text="Clearing...")
 		for i in range(self.SIZE):
 			for j in range(self.SIZE):
 				self.but[i][j].configure(text=" ")
@@ -437,38 +447,10 @@ class Sudoku(tk.Frame):
 					Sfile.write("# X\n")
 				Sfile.write("\n".join([",".join([self.but[i][j].cget("text") for j in range(self.SIZE)]) for i in range(self.SIZE)])+"\n")
 
-def Libs():
-	# returns a dict
-	s_lib={}
-	
-	for ss in range(2,7):
-		# Shared C library
-		lib_base = "./" #location
-		lib_base += "sudoku3_lib" # base name
-		
-		lib_base += str(ss*ss)	
-
-		# get the right filename
-		if platform.uname()[0] == "Windows":
-			lib_base += ".dll" 
-		if platform.uname()[0] == "Linux":
-			lib_base += ".so" 
-		else:
-			lib_base += ".dylib" 
-
-		# load library
-		global solve_lib
-		s_lib[ss] = ctypes.cdll.LoadLibrary(lib_base)
-	
-	return s_lib
-
 def main(args):
 	# keyboard interrupt
 	signal.signal(signal.SIGINT, signal_handler)
 
-	# set up library dist
-	#global solve_lib
-	#s_lib = Libs()
 	Persist.LibSet()
 	 
 	while True:
