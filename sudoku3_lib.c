@@ -17,6 +17,7 @@
 #include <inttypes.h>
 #include <signal.h>
 #include <pthread.h>
+#include <sched.h>
 
 // Thread synchronization (signal to thread and back)
 enum solve_state { 
@@ -34,6 +35,83 @@ enum solve_state {
 pthread_mutex_t solvestate_lock = PTHREAD_MUTEX_INITIALIZER ;
 
 pthread_t worker_thread ;
+
+enum ethread { ethread_started , ethread_wounded , ethread_dead } ;
+struct threadlist {
+	struct threadlist * next ;
+	pthread_mutex_t lock ;
+	enum ethread state ;
+	pthread_t thread ;
+} ;
+
+//pthread_mutex_t threadlist_lock = PTHREAD_MUTEX_INITIALIZER ;
+struct threadlist * threadlist_head = NULL ;
+
+struct threadlist * thread_new( void * (*func)( void *) ) {
+	struct threadlist * thr = malloc( sizeof( struct threadlist ) ) ;
+	
+	if ( thr ) {
+		pthread_attr_t attr ;
+		pthread_attr_init( &attr ) ;
+		pthread_attr_setdetachstate( &attr, PTHREAD_CREATE_DETACHED );
+		thr->state = ethread_started ;
+		pthread_mutex_init( &(thr->lock) , NULL ) ;
+		
+		//pthread_mutex_lock( & threadlist_lock ) ;
+			thr->next = threadlist_head ; 
+			threadlist_head = thr ;
+		//pthread_mutex_unlock( & threadlist_lock ) ;
+		pthread_create( &(thr->thread), &attr, func , thr ) ; 
+		
+		pthread_attr_destroy( & attr ) ;
+	}
+	//fprintf(stderr,"New thread %p->%p\n",thr,thr->next);
+	return thr ;
+}
+
+void threadlist_kill( void ) {
+	int i ;
+	
+	for (i=0 ; i<5 ; ++i ) {
+		struct threadlist * past = threadlist_head ;
+		struct threadlist * current = threadlist_head ;
+		//fprintf(stderr,"kill %d head %p\n",i,threadlist_head);
+		if (threadlist_head ) {
+			//pthread_mutex_lock( & threadlist_lock ) ;
+			while ( current ) {
+				struct threadlist * next = current->next ;
+				//fprintf(stderr,"Current %p\n",current);
+				pthread_mutex_lock( &(current->lock) ) ;
+				switch ( current->state ) {
+					case ethread_started:
+					case ethread_wounded:
+						//fprintf(stderr,"Start or wounded\n");
+						current->state = ethread_wounded ;
+						pthread_mutex_unlock( &(current->lock) ) ;
+						sched_yield() ;
+						past = current ;
+						break ;
+					case ethread_dead:
+					default:
+						//fprintf(stderr,"Alreaady dead\n");
+						if ( past == threadlist_head ) {
+							threadlist_head = next ;
+							past = next ;
+						} else {
+							past->next = next ;
+						}
+						pthread_mutex_unlock( &(current->lock) ) ;
+						free( current ) ;
+						break ;
+				}
+				current = next ;
+			}
+			//pthread_mutex_unlock( & threadlist_lock ) ;
+		} else {
+			break ;
+		}
+	}
+}
 
 // SIZE x SIZE sudoku board
 #ifndef SUBSIZE
@@ -155,41 +233,10 @@ struct FillState * StateStackCurrent( void ) {
 	return & State[statestack.end] ;
 }
 
-void KillThread( void ) {
-	static int threads = 0 ;
-	
-	if ( threads ) {
-		void * res ;
-		switch( pthread_cancel( worker_thread ) )
-		{
-			case ESRCH:
-				//fprintf(stderr,"No thread?\n");
-				break ;
-			case 0:
-				switch ( pthread_join(worker_thread, &res ) )
-				{
-					case 0:
-					case ESRCH:
-						break ;
-					default:
-						fprintf(stderr,"Couldn't merge with killed thread\n");
-						exit(1) ;
-				}
-			default:
-				fprintf(stderr,"Couldn't cancel existing thread\n") ;
-				exit(1);
-		}
-	}
-	threads = 1 ;
-}
-
 void StartThread( void * (*func)( void *) ) 
 {
 	SolveState = solve_working ;
-	if ( pthread_create( & worker_thread, NULL, func, NULL ) ) {
-		fprintf( stderr, "Couldn't create the thread\n" ) ;
-		exit(1) ;
-	}
+	thread_new( func ) ;
 }
 
 struct Subsets {
@@ -710,9 +757,28 @@ struct FillState * Next_move( struct FillState * pFS ) {
 	return Set_Square( pFS, fi, fj ) ;
 }
 
+void threadlist_check( struct threadlist * thr ) {
+	pthread_mutex_lock( &(thr->lock) ) ;
+		if ( thr->state == ethread_wounded ) {
+			thr->state = ethread_dead ;
+			pthread_mutex_unlock( &(thr->lock) ) ;
+			pthread_exit(NULL);
+		}
+	pthread_mutex_unlock( &(thr->lock) ) ;
+}
+
+void threadlist_end( struct threadlist * thr ) {
+	pthread_mutex_lock( &(thr->lock) ) ;
+	thr->state = ethread_dead ;
+	pthread_mutex_unlock( &(thr->lock) ) ;
+	pthread_exit(NULL);
+}
+
 void * SolveLoop( void * v ) {	
+	struct threadlist * thr = v ;
 	struct FillState * pFS = StateStackCurrent() ;
 	while ( pFS && pFS->done == 0 ) {
+		threadlist_check( thr ) ;
 		//printf("Solveloop\n");
 		pFS = Next_move( pFS ) ;
 		if ( (pFS == NULL) || CheckAvailable( pFS ) ) {
@@ -724,12 +790,14 @@ void * SolveLoop( void * v ) {
 	SolveState = pFS==NULL ? solve_unsolveable : solve_solveable ;
 	pthread_mutex_unlock( &solvestate_lock ) ;
 	
+	threadlist_end( thr ) ;
 	return pFS ;
 }
 
-struct FillState * SolveLoop1( struct FillState * pFS ) {	
+struct FillState * SolveLoop1( struct FillState * pFS, struct threadlist * thr ) {	
 	while ( pFS && pFS->done == 0 ) {
 		pFS = Next_move( pFS ) ;
+		threadlist_check( thr ) ;
 		if ( (pFS == NULL) || CheckAvailable( pFS ) ) {
 			pFS = StateStackPop() ;
 		}
@@ -741,13 +809,14 @@ struct FillState * SolveLoop1( struct FillState * pFS ) {
 // For TestUnique -- no pause/resume
 // Find second solution
 // Assumes pFS not NULL initially
-struct FillState * SolveLoop2( void ) {
+struct FillState * SolveLoop2( struct threadlist * thr ) {
 	struct FillState * pFS = StateStackPop() ; // Go back to prior
 	if (pFS == NULL ) {
 		return NULL ;
 	}
 	pFS->done = 0 ; // Look again
 	while ( pFS && pFS->done == 0 ) {
+		threadlist_check( thr ) ;
 		//printf("Solveloop\n");
 		pFS = Next_move( pFS ) ;
 		if ( (pFS == NULL) || CheckAvailable( pFS ) ) {
@@ -759,22 +828,24 @@ struct FillState * SolveLoop2( void ) {
 }
 
 void * SolveLoopU( void * v ) {	
+	struct threadlist * thr = v ;
 	struct FillState * pFS = StateStackCurrent() ;
 	
-	pFS = SolveLoop1( pFS ) ;
+	pFS = SolveLoop1( pFS, thr ) ;
 
 	pthread_mutex_lock( &solvestate_lock ) ;
 	SolveState = pFS==NULL ? solve_unsolveable : solve_solveable ;
 	pthread_mutex_unlock( &solvestate_lock ) ;
 
 	if ( pFS ) {
-		pFS = SolveLoop2() ;
+		pFS = SolveLoop2(thr) ;
 		
 		pthread_mutex_lock( &solvestate_lock ) ;
 		SolveState = pFS==NULL ? solve_unique : solve_multiple ;
 		pthread_mutex_unlock( &solvestate_lock ) ;
 	}
 	
+	threadlist_end( thr ) ;
 	return pFS ;
 }
 
@@ -789,7 +860,7 @@ struct FillState * Setup_board( void ) {
 	int * set = preset; // pointer though preset array
 	struct FillState * pFS ;
 	
-	KillThread() ;
+	threadlist_kill() ;
 	SolveState = solve_setup ;
 	
 	pFS = StateStackInit() ; // needs make_pattern
@@ -846,7 +917,8 @@ int GetAvailable( int testi, int testj, int * return_list ) {
 	int i, j ;
 	int * set = preset ; // pointer though preset array
 
-	KillThread() ;
+	//fprintf(stderr,"Avail for %d,%d\n",testi,testj);
+	threadlist_kill() ;
 	SolveState = solve_setup ;
 	
 	// Single Available
