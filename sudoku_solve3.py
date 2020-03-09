@@ -7,6 +7,7 @@ import argparse
 import ctypes
 import platform
 import signal
+import tkinter.scrolledtext as scrolledtext
 
 def signal_handler(signal, frame):
     print("\nForced end\n")
@@ -299,8 +300,30 @@ class Sudoku(tk.Frame):
 				self.set_array( i, j, Persist.Data[i][j] )
 		Persist.Data = None
 			
-	def about(self):
+	def About(self):
 		print("Sudoku Solve by Paul Alfille 2020")
+		
+	def Help( self ):
+		self.helpwin = tk.Toplevel()
+		self.helptext = scrolledtext.ScrolledText(self.helpwin, undo=False)
+		tk.Button(self.helpwin,text="Ok",command=lambda: self.helpwin.destroy()).pack(side="bottom")
+		self.helptext.insert("end",'''\
+Sudoku count is a suite of programs to investigate soduku solving.
+
+This program, sudoku_solve, is a sudoku board builder and solver.
+	The size of the board can be varied, from 4X4 to 36x36 (although the larger sizes are difficult to use or solve).
+	Each square can be assigned (by default only allowable values are enabled, but others can be forced)
+	The status line will show the current state of the board.
+	Solving can take a while for larger boards, but intermediate steps will be shown.
+	It is possible to interrupt solving be trying to assign a square.
+	
+Sudoku, for those who are not familiar, is a puzzle to assign values to each square in a grid such that no repeat values are in each row, column or subsquare
+	Harder constraints can be added (Window and X in the options).
+
+The structure of the program (for those who care) is python3 interface, using tkinter with a C library backend for faster calculation
+		''')
+		self.helptext.configure(state="disabled")
+		self.helptext.pack(expand=True,fill="both")
 		
 	def Size(self) :
 		if ( self.ss_choose != Persist.SUBSIZE ):
@@ -380,7 +403,8 @@ class Sudoku(tk.Frame):
 
 		self.helpmenu = tk.Menu(self.menu,tearoff=0)
 		self.menu.add_cascade(label="Help",menu=self.helpmenu,font=self.font)
-		self.helpmenu.add_command(label="About",command=self.about,font=self.font)
+		self.helpmenu.add_command(label="About",command=self.About,font=self.font)
+		self.helpmenu.add_command(label="Help",command=self.Help,font=self.font)
 
 		self.master.config(menu=self.menu)
 			
