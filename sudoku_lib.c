@@ -400,7 +400,7 @@ struct FillState * Next_move( struct FillState * pFS ) {
 struct FillState * SolveLoop( struct FillState * pFS ) {	
 	time_t next = time(NULL) + 6 ; // every minute +
 	while ( pFS && pFS->done == 0 ) {
-		//printf("Solveloop\n");
+		printf("Solveloop\n");
 		pFS = Next_move( pFS ) ;
 		if ( pFS == NULL ) {
 			if ( Debug ) {
@@ -517,7 +517,7 @@ int Solve( int X, int Window, int debug, int * preset ) {
 	Debug = debug ;
 	ReDoCount = 0 ;
 	
-	//printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
+	printf("X=%d, W=%d\n",Xpattern,Wpattern) ;
 	
 	if ( pFS ) {
 		return Return_board( SolveLoop( pFS ) ) ;

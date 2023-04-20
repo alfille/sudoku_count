@@ -6,6 +6,7 @@ Count sudoku candidate percentages
 // Based on Discussion between Kendrick Shaw MD PhD and Paul Alfille MD
 // MIT license 2019
 // by Paul H Alfille
+// More some musing than state of the art
 
 Basically creates candidate squares (row by row unless no value possible)
 Then tests 3x3 subsquares
